@@ -66,6 +66,7 @@ impl fmt::Display for ConnectionTypeWrapper {
             ConnectionType::Serial => write!(f, "Serial"),
             ConnectionType::Rlogin => write!(f, "Rlogin"),
             ConnectionType::RloginSwapped => write!(f, "Rlogin (Swapped)"),
+            ConnectionType::Reticulum => write!(f, "Reticulum (rnsh)"),
         }
     }
 }
@@ -215,6 +216,7 @@ impl super::DialingDirectoryState {
                     ConnectionTypeWrapper(ConnectionType::SecureWebsocket),
                     ConnectionTypeWrapper(ConnectionType::Rlogin),
                     ConnectionTypeWrapper(ConnectionType::RloginSwapped),
+                    ConnectionTypeWrapper(ConnectionType::Reticulum),
                 ];
 
                 let protocol_pick = pick_list(protocols, Some(ConnectionTypeWrapper(addr.protocol)), move |p: ConnectionTypeWrapper| {

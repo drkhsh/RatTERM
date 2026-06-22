@@ -125,7 +125,7 @@ impl Display for ConnectionType {
     }
 }
 */
-pub const ALL: [ConnectionType; 8] = [
+pub const ALL: [ConnectionType; 9] = [
     ConnectionType::Telnet,
     ConnectionType::Raw,
     ConnectionType::Modem,
@@ -134,6 +134,7 @@ pub const ALL: [ConnectionType; 8] = [
     ConnectionType::Websocket,
     ConnectionType::Rlogin,
     ConnectionType::RloginSwapped,
+    ConnectionType::Reticulum,
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

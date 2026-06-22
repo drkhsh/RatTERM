@@ -1038,6 +1038,14 @@ impl TerminalThread {
                 };
                 Box::new(icy_net::rlogin::RloginConnection::open_with_proxy(&config.connection_info.endpoint(), rlogin_config, config.timeout, config.proxy.as_ref()).await?)
             }
+            #[cfg(feature = "reticulum")]
+            ConnectionType::Reticulum => {
+                let Some(dest) = crate::terminal::reticulum::parse_destination(&config.connection_info.host) else {
+                    return Err("Invalid Reticulum destination hash (expected 32 hex characters)".into());
+                };
+                let (cols, rows) = config.window_size;
+                Box::new(crate::terminal::reticulum::ReticulumConnection::open(dest, cols, rows).await?)
+            }
             other => {
                 return Err(format!("Unsupported connection type: {other:?}").into());
             }

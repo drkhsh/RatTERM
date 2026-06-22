@@ -10,6 +10,7 @@ Visit [Telnet BBS Guide](https://www.telnetbbsguide.com/) to explore active BBSe
 
 - **Protocols**: Telnet, SSH, RLogin, Raw TCP, WebSocket (including secure)
 - **Proxy (Tor / I2P)**: Per-connection SOCKS5 proxy with remote DNS, so `.onion` / `.i2p` BBSes work
+- **Reticulum (rnsh)**: Dial BBSes exposed over the Reticulum mesh via an `rnsh` listener
 - **Modems** still supported :).
 - **Baud emulation**: Authentic modem speeds for nostalgia
 
@@ -22,6 +23,25 @@ proxy (remote DNS), which is what makes `.onion` and `.i2p` addresses reachable.
 - Pick a proxy in the entry's options: **Tor** (`127.0.0.1:9050`),
   **I2P** (`127.0.0.1:4447`), or **Custom SOCKS5** (host/port + optional auth).
 - WebSocket is not proxied yet.
+
+#### Reticulum / rnsh
+
+RatTERM can reach BBSes published over the [Reticulum](https://reticulum.network/)
+network behind an `rnsh` remote-shell listener (e.g. `rnsh-rs -l -- <bbs>`).
+
+- In the dialing directory, set the connection type to **Reticulum (rnsh)** and
+  enter the 32-character hex **destination hash** as the address (an optional
+  `rns://` prefix is accepted).
+- RatTERM uses your **existing Reticulum configuration** (the default config
+  directory shared with `rnsd` and other RNS apps); at least one configured
+  interface is required to route to the destination.
+- A client identity is created and stored under IcyTERM's config directory
+  (`reticulum_identity`) on first use; add its hash to the listener's allowed
+  list (`rnsh-rs -a ...`) for authenticated access.
+- This transport is built on the experimental
+  [rsReticulum](https://github.com/ratspeak/rsReticulum) library and is gated
+  behind the `reticulum` cargo feature (enabled by default; not available on the
+  wasm target; build it with `--no-default-features`).
 
 ### 🖥️ Terminal Emulations
 

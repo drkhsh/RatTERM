@@ -64,6 +64,7 @@ impl fmt::Display for ConnectionInformation {
                     ConnectionType::Modem => "modem",
                     ConnectionType::Rlogin => "rlogin",
                     ConnectionType::RloginSwapped => "rlogin-swapped",
+                    ConnectionType::Reticulum => "rns",
                     _ => "unknown",
                 }
             )?;
@@ -138,6 +139,7 @@ impl ConnectionInformation {
                     "modem" => Some(ConnectionType::Modem),
                     "rlogin" => Some(ConnectionType::Rlogin),
                     "rlogin-swapped" => Some(ConnectionType::RloginSwapped),
+                    "rns" => Some(ConnectionType::Reticulum),
                     _ => None,
                 };
 

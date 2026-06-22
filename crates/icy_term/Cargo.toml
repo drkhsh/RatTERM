@@ -7,8 +7,15 @@ license.workspace = true
 description = "A BBS terminal with CP437, PETSCII, Viewdata, RIP, SkyPix, and SyncTERM door graphics/audio"
 repository = "https://github.com/mkrueger/icy_tools"
 
+[features]
+default = ["reticulum"]
+# rnsh transport; not available on wasm32, build wasm with --no-default-features.
+reticulum = ["dep:rns-runtime", "dep:rns-identity"]
+
 [dependencies]
 icy_net = { workspace = true }
+rns-runtime = { workspace = true, optional = true }
+rns-identity = { workspace = true, optional = true }
 icy_engine = { workspace = true }
 icy_engine_scripting = { workspace = true }
 icy_parser_core = { workspace = true }

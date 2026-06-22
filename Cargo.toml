@@ -29,8 +29,10 @@ icy_sauce = { git = "https://github.com/mkrueger/icy_sauce" }
 
 #icy_sauce = { path = "../icy_sauce" }
 icy_sixel = "0.6.0"
-icy_net = { git = "https://github.com/mkrueger/icy_board", rev = "b42698f0afa6b4347af45aca7718d6d10b90c8af" }
+# Local fork: adds ConnectionType::Reticulum for the rnsh transport (not yet upstreamed).
+# Based on b42698f0afa6b4347af45aca7718d6d10b90c8af, the rev upstream pins.
 #icy_net = { path = "../icy_board/crates/icy_net" }
+icy_net = { git = "https://github.com/drkhsh/icy_board" }
 #unarc-rs = { path ="../unarc-rs" }
 unarc-rs = { git = "https://github.com/mkrueger/unarc-rs" }
 retrofont = { git = "https://github.com/mkrueger/retrofont" }
@@ -43,6 +45,11 @@ icy_engine_edit = { path = "crates/icy_engine_edit" }
 libyaff = { git = "https://github.com/mkrueger/libyaff" }
 
 codepages = { git = "https://github.com/mkrueger/icy_board" }
+
+# Reticulum (rnsh) transport — experimental, pinned by rev.
+rns-runtime = { git = "https://github.com/ratspeak/rsReticulum", rev = "e6dd6b3ab3dc38a7695390fc20514312633efeb2" }
+rns-identity = { git = "https://github.com/ratspeak/rsReticulum", rev = "e6dd6b3ab3dc38a7695390fc20514312633efeb2" }
+
 zip = "8.6.0"
 lazy_static = "1.5.0"
 semver = "1.0.28"

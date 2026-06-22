@@ -1,0 +1,4 @@
+[toolchain]
+# rsReticulum needs edition 2024 (rust >= 1.85); pinned to a known-good stable
+# so CI and local builds agree.
+channel = "1.96.0"

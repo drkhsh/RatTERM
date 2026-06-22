@@ -555,6 +555,7 @@ impl TerminalWindow {
                 icy_net::ConnectionType::SecureWebsocket => "WSS".to_string(),
                 icy_net::ConnectionType::Rlogin => "Rlogin".to_string(),
                 icy_net::ConnectionType::RloginSwapped => "Rlogin (Swapped)".to_string(),
+                icy_net::ConnectionType::Reticulum => "Reticulum".to_string(),
                 _ => "Unknown".to_string(),
             }
         } else {
