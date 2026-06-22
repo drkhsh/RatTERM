@@ -3594,8 +3594,8 @@ dependencies = [
 
 [[package]]
 name = "icy_net"
-version = "0.2.0"
-source = "git+https://github.com/mkrueger/icy_board#d1f2938db5d08578bcd069cb3f4a0586fe2920c8"
+version = "0.2.1"
+source = "git+https://github.com/drkhsh/icy_board?branch=feature%2Fsocks5-proxy#a9c796032dfd1256028e91e358c8e61e91623b74"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3615,6 +3615,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "tokio-socks",
  "tokio-tungstenite",
  "url",
  "webpki-roots 1.0.9",
@@ -9047,6 +9048,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1729aa945f29d91ba541258c8df89027d5792d85a8841fb65e8bf0f4ede4ef61"
 dependencies = [
  "rustls",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-socks"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7e2948f60dbe26b35f2c7fb74ac2854c1fddded0fe9d7548fcc674a246f7615"
+dependencies = [
+ "either",
+ "futures-util",
+ "thiserror 1.0.69",
  "tokio",
 ]
 

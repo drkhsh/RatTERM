@@ -343,6 +343,39 @@ impl DialingDirectoryState {
                             }
                         }
                     }
+                    AddressFieldChange::ProxySelect(preset) => {
+                        addr.proxy = match preset {
+                            ProxyPreset::None => None,
+                            ProxyPreset::Tor => Some(icy_net::proxy::ProxyConfig::socks5("127.0.0.1", 9050)),
+                            ProxyPreset::I2p => Some(icy_net::proxy::ProxyConfig::socks5("127.0.0.1", 4447)),
+                            // Keep any existing settings when switching to custom.
+                            ProxyPreset::Custom => Some(addr.proxy.clone().unwrap_or_else(|| icy_net::proxy::ProxyConfig::socks5("127.0.0.1", 1080))),
+                        };
+                    }
+                    AddressFieldChange::ProxyHost(host) => {
+                        if let Some(proxy) = addr.proxy.as_mut() {
+                            proxy.host = host;
+                        }
+                    }
+                    AddressFieldChange::ProxyPort(port) => {
+                        if let Some(proxy) = addr.proxy.as_mut() {
+                            if port.is_empty() {
+                                proxy.port = 0;
+                            } else if let Ok(value) = port.parse::<u16>() {
+                                proxy.port = value;
+                            }
+                        }
+                    }
+                    AddressFieldChange::ProxyUser(user) => {
+                        if let Some(proxy) = addr.proxy.as_mut() {
+                            proxy.username = if user.is_empty() { None } else { Some(user) };
+                        }
+                    }
+                    AddressFieldChange::ProxyPassword(password) => {
+                        if let Some(proxy) = addr.proxy.as_mut() {
+                            proxy.password = if password.is_empty() { None } else { Some(password) };
+                        }
+                    }
                 }
 
                 Task::none()
@@ -610,6 +643,46 @@ pub enum AddressFieldChange {
     LfExpand(bool),
     ToggleCustomPalette(bool),
     PaletteColor(usize, String),
+    ProxySelect(ProxyPreset),
+    ProxyHost(String),
+    ProxyPort(String),
+    ProxyUser(String),
+    ProxyPassword(String),
+}
+
+/// Proxy presets shown in the dialing-directory picker. Tor and I2P fill in
+/// their well-known local SOCKS5 ports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProxyPreset {
+    None,
+    Tor,
+    I2p,
+    Custom,
+}
+
+impl ProxyPreset {
+    pub const OPTIONS: [ProxyPreset; 4] = [ProxyPreset::None, ProxyPreset::Tor, ProxyPreset::I2p, ProxyPreset::Custom];
+
+    /// Derive the preset currently represented by an address' proxy config.
+    pub fn from_config(proxy: Option<&icy_net::proxy::ProxyConfig>) -> ProxyPreset {
+        match proxy {
+            None => ProxyPreset::None,
+            Some(p) if p.host == "127.0.0.1" && p.port == 9050 => ProxyPreset::Tor,
+            Some(p) if p.host == "127.0.0.1" && p.port == 4447 => ProxyPreset::I2p,
+            Some(_) => ProxyPreset::Custom,
+        }
+    }
+}
+
+impl std::fmt::Display for ProxyPreset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProxyPreset::None => write!(f, "No proxy"),
+            ProxyPreset::Tor => write!(f, "Tor (SOCKS5 127.0.0.1:9050)"),
+            ProxyPreset::I2p => write!(f, "I2P (SOCKS5 127.0.0.1:4447)"),
+            ProxyPreset::Custom => write!(f, "Custom SOCKS5"),
+        }
+    }
 }
 
 impl From<DialingDirectoryMsg> for Message {
