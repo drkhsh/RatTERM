@@ -717,8 +717,8 @@ impl CommandParser for AnsiParser {
                     b'z' => {
                         // Invoke Macro - execute it internally
                         let n = self.params.first().copied().unwrap_or(0) as usize;
-                        self.invoke_macro(n, sink);
                         self.reset();
+                        self.invoke_macro(n, sink);
                         i += 1;
                         printable_start = i;
                     }

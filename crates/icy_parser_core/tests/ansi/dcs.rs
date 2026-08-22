@@ -53,6 +53,18 @@ fn test_dcs_hex_macro_repeat_capped() {
 }
 
 #[test]
+fn test_nested_dec_macros_parse_from_default_state() {
+    let mut parser = AnsiParser::new();
+    let mut sink = CollectSink::new();
+
+    parser.parse(b"\x1bP1;0;1!z41\x1b\\", &mut sink);
+    parser.parse(b"\x1bP2;0;1!z5B1B5B312A7A5D\x1b\\", &mut sink);
+    parser.parse(b"\x1b[2*z", &mut sink);
+
+    assert_eq!(sink.text, b"[A]");
+}
+
+#[test]
 fn test_dcs_font_loading() {
     let mut parser = AnsiParser::new();
     let mut sink = CollectSink::new();
