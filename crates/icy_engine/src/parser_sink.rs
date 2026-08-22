@@ -513,6 +513,9 @@ impl<'a> ScreenSink<'a> {
             AnsiMode::InsertReplace => {
                 self.screen.caret_mut().insert_mode = enabled;
             }
+            AnsiMode::LineFeedNewLine => {
+                self.screen.terminal_state_mut().lf_expand = enabled;
+            }
         }
     }
 

@@ -213,6 +213,17 @@ fn test_synchronized_output_mode() {
 }
 
 #[test]
+fn test_line_feed_new_line_mode() {
+    let mut parser = AnsiParser::new();
+    let mut sink = CollectSink::new();
+
+    parser.parse(b"\x1B[20h\x1B[20l", &mut sink);
+
+    assert_eq!(sink.cmds[0], TerminalCommand::CsiSetMode(AnsiMode::LineFeedNewLine, true));
+    assert_eq!(sink.cmds[1], TerminalCommand::CsiSetMode(AnsiMode::LineFeedNewLine, false));
+}
+
+#[test]
 fn test_last_column_flag_modes() {
     let mut parser = AnsiParser::new();
     let mut sink = CollectSink::new();

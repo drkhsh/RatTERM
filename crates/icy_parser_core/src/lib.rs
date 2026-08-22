@@ -247,7 +247,6 @@ pub enum Wrapping {
 
 /// ANSI Mode for SM/RM commands (ESC[nh / ESC[nl)
 /// Standard ANSI modes - distinct from DEC private modes (which use ESC[?nh)
-/// Currently only IRM (Insert/Replace Mode) is used by icy_engine
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnsiMode {
@@ -255,12 +254,18 @@ pub enum AnsiMode {
     /// When set: newly received characters are inserted, pushing existing characters to the right
     /// When reset: newly received characters replace (overwrite) existing characters
     InsertReplace = 4,
+
+    /// LNM - Line Feed/New Line Mode (Mode 20)
+    /// When set: LF, FF and VT also return the cursor to the first column
+    /// When reset: they only move the cursor down, keeping the column
+    LineFeedNewLine = 20,
 }
 
 impl AnsiMode {
     fn from_u16(n: u16) -> Option<Self> {
         match n {
             4 => Some(Self::InsertReplace),
+            20 => Some(Self::LineFeedNewLine),
             _ => None,
         }
     }

@@ -18,6 +18,22 @@ fn test_text_pane_get_size() {
 }
 
 #[test]
+fn test_lnm_controls_whether_line_feed_keeps_the_column() {
+    let mut screen = TextScreen::new(Size::new(80, 25));
+    let mut parser = AnsiParser::new();
+
+    // LNM reset: LF moves down but keeps the column.
+    parser.parse(b"\x1b[20l\x1b[5;20H\n", &mut ScreenSink::new(&mut screen));
+    assert!(!screen.terminal_state().lf_expand);
+    assert_eq!(screen.caret_position(), Position::new(19, 5));
+
+    // LNM set: LF also returns to the first column.
+    parser.parse(b"\x1b[20h\x1b[5;20H\n", &mut ScreenSink::new(&mut screen));
+    assert!(screen.terminal_state().lf_expand);
+    assert_eq!(screen.caret_position(), Position::new(0, 5));
+}
+
+#[test]
 fn test_osc8_hyperlink_survives_sink_boundary_and_wraps() {
     let mut screen = TextScreen::new(Size::new(3, 2));
     ScreenSink::new(&mut screen).operating_system_command(OperatingSystemCommand::Hyperlink {
