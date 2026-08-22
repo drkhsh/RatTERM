@@ -299,6 +299,13 @@ impl TextBuffer {
         // Fallback colors as u32
         let default_fg = Palette::rgb_to_rgba_u32(255, 255, 255);
         let default_bg = Palette::rgb_to_rgba_u32(0, 0, 0);
+        let extended_color = |idx: usize| {
+            let palette_index = crate::ansi_to_internal_palette_index(idx as u32) as usize;
+            palette_cache.get(palette_index).copied().unwrap_or_else(|| {
+                let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
+                Palette::rgb_to_rgba_u32(r, g, b)
+            })
+        };
 
         let selection_active = options.selection.is_some();
         let selection_ref = options.selection.as_ref();
@@ -356,8 +363,7 @@ impl TextBuffer {
                             Palette::rgb_to_rgba_u32(r, g, b)
                         } else if ch.attribute.is_background_ext() {
                             let idx = ch.attribute.background_ext() as usize;
-                            let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
-                            Palette::rgb_to_rgba_u32(r, g, b)
+                            extended_color(idx)
                         } else {
                             let bg_idx = bg as usize;
                             if bg_idx < palette_cache.len() {
@@ -371,8 +377,7 @@ impl TextBuffer {
                             Palette::rgb_to_rgba_u32(r, g, b)
                         } else if ch.attribute.is_foreground_ext() {
                             let idx = ch.attribute.foreground_ext() as usize;
-                            let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
-                            Palette::rgb_to_rgba_u32(r, g, b)
+                            extended_color(idx)
                         } else {
                             let fg_idx = fg as usize;
                             if fg_idx < palette_cache.len() {
@@ -389,8 +394,7 @@ impl TextBuffer {
                         Palette::rgb_to_rgba_u32(r, g, b)
                     } else if ch.attribute.is_foreground_ext() {
                         let idx = ch.attribute.foreground_ext() as usize;
-                        let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
-                        Palette::rgb_to_rgba_u32(r, g, b)
+                        extended_color(idx)
                     } else {
                         let fg_idx = fg as usize;
                         if fg_idx < palette_cache.len() {
@@ -404,8 +408,7 @@ impl TextBuffer {
                         Palette::rgb_to_rgba_u32(r, g, b)
                     } else if ch.attribute.is_background_ext() {
                         let idx = ch.attribute.background_ext() as usize;
-                        let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
-                        Palette::rgb_to_rgba_u32(r, g, b)
+                        extended_color(idx)
                     } else {
                         let bg_idx = bg as usize;
                         if bg_idx < palette_cache.len() {
@@ -510,6 +513,13 @@ impl TextBuffer {
         let palette_cache = self.palette.palette_cache_rgba();
         let default_fg = Palette::rgb_to_rgba_u32(255, 255, 255);
         let default_bg = Palette::rgb_to_rgba_u32(0, 0, 0);
+        let extended_color = |idx: usize| {
+            let palette_index = crate::ansi_to_internal_palette_index(idx as u32) as usize;
+            palette_cache.get(palette_index).copied().unwrap_or_else(|| {
+                let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
+                Palette::rgb_to_rgba_u32(r, g, b)
+            })
+        };
 
         let selection_active = options.selection.is_some();
         let selection_ref = options.selection.as_ref();
@@ -558,8 +568,7 @@ impl TextBuffer {
                             Palette::rgb_to_rgba_u32(r, g, b)
                         } else if ch.attribute.is_background_ext() {
                             let idx = ch.attribute.background_ext() as usize;
-                            let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
-                            Palette::rgb_to_rgba_u32(r, g, b)
+                            extended_color(idx)
                         } else {
                             let bg_idx = bg as usize;
                             if bg_idx < palette_cache.len() {
@@ -573,8 +582,7 @@ impl TextBuffer {
                             Palette::rgb_to_rgba_u32(r, g, b)
                         } else if ch.attribute.is_foreground_ext() {
                             let idx = ch.attribute.foreground_ext() as usize;
-                            let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
-                            Palette::rgb_to_rgba_u32(r, g, b)
+                            extended_color(idx)
                         } else {
                             let fg_idx = fg as usize;
                             if fg_idx < palette_cache.len() {
@@ -591,8 +599,7 @@ impl TextBuffer {
                         Palette::rgb_to_rgba_u32(r, g, b)
                     } else if ch.attribute.is_foreground_ext() {
                         let idx = ch.attribute.foreground_ext() as usize;
-                        let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
-                        Palette::rgb_to_rgba_u32(r, g, b)
+                        extended_color(idx)
                     } else {
                         let fg_idx = fg as usize;
                         if fg_idx < palette_cache.len() {
@@ -606,8 +613,7 @@ impl TextBuffer {
                         Palette::rgb_to_rgba_u32(r, g, b)
                     } else if ch.attribute.is_background_ext() {
                         let idx = ch.attribute.background_ext() as usize;
-                        let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
-                        Palette::rgb_to_rgba_u32(r, g, b)
+                        extended_color(idx)
                     } else {
                         let bg_idx = bg as usize;
                         if bg_idx < palette_cache.len() {
@@ -716,6 +722,13 @@ impl TextBuffer {
 
         // Palette cache (u32 version for faster writes)
         let palette_cache = self.palette.palette_cache_rgba();
+        let extended_color = |idx: usize| {
+            let palette_index = crate::ansi_to_internal_palette_index(idx as u32) as usize;
+            palette_cache.get(palette_index).copied().unwrap_or_else(|| {
+                let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
+                Palette::rgb_to_rgba_u32(r, g, b)
+            })
+        };
 
         let selection_active = options.selection.is_some();
         let selection_ref = options.selection.as_ref();
@@ -849,8 +862,7 @@ impl TextBuffer {
                         Palette::rgb_to_rgba_u32(r, g, b)
                     } else if render_ch.attribute.is_background_ext() {
                         let idx = render_ch.attribute.background_ext() as usize;
-                        let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
-                        Palette::rgb_to_rgba_u32(r, g, b)
+                        extended_color(idx)
                     } else {
                         let bg_idx = bg as usize;
                         if bg_idx < palette_cache.len() {
@@ -864,8 +876,7 @@ impl TextBuffer {
                         Palette::rgb_to_rgba_u32(r, g, b)
                     } else if render_ch.attribute.is_foreground_ext() {
                         let idx = render_ch.attribute.foreground_ext() as usize;
-                        let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
-                        Palette::rgb_to_rgba_u32(r, g, b)
+                        extended_color(idx)
                     } else {
                         let fg_idx = fg as usize;
                         if fg_idx < palette_cache.len() {
@@ -882,8 +893,7 @@ impl TextBuffer {
                     Palette::rgb_to_rgba_u32(r, g, b)
                 } else if render_ch.attribute.is_foreground_ext() {
                     let idx = render_ch.attribute.foreground_ext() as usize;
-                    let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
-                    Palette::rgb_to_rgba_u32(r, g, b)
+                    extended_color(idx)
                 } else {
                     let fg_idx = fg as usize;
                     if fg_idx < palette_cache.len() {
@@ -897,8 +907,7 @@ impl TextBuffer {
                     Palette::rgb_to_rgba_u32(r, g, b)
                 } else if render_ch.attribute.is_background_ext() {
                     let idx = render_ch.attribute.background_ext() as usize;
-                    let (r, g, b) = XTERM_256_PALETTE[idx].1.rgb();
-                    Palette::rgb_to_rgba_u32(r, g, b)
+                    extended_color(idx)
                 } else {
                     let bg_idx = bg as usize;
                     if bg_idx < palette_cache.len() {

@@ -3,6 +3,30 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 
+pub const fn ansi_to_internal_palette_index(index: u32) -> u32 {
+    if index < 16 {
+        const ANSI_TO_DOS: [u32; 8] = [0, 4, 2, 6, 1, 5, 3, 7];
+        (index & 8) + ANSI_TO_DOS[(index & 7) as usize]
+    } else {
+        index
+    }
+}
+
+#[cfg(test)]
+mod palette_index_tests {
+    use super::ansi_to_internal_palette_index;
+
+    #[test]
+    fn ansi_palette_indices_map_to_dos_attributes() {
+        let expected = [0, 4, 2, 6, 1, 5, 3, 7, 8, 12, 10, 14, 9, 13, 11, 15];
+        for (ansi_index, dos_index) in expected.into_iter().enumerate() {
+            assert_eq!(ansi_to_internal_palette_index(ansi_index as u32), dos_index);
+        }
+        assert_eq!(ansi_to_internal_palette_index(16), 16);
+        assert_eq!(ansi_to_internal_palette_index(255), 255);
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Color {
     #[serde(skip_serializing)]

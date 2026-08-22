@@ -1209,3 +1209,39 @@ impl<'a> shader::Program<TerminalMessage> for CRTShaderProgram<'a> {
         self.term.cursor_icon.read().unwrap_or_default()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use icy_engine::{AttributedChar, Screen, ScreenSink, Size, TextAttribute, TextScreen};
+    use icy_parser_core::{CommandSink, OperatingSystemCommand};
+    use parking_lot::Mutex;
+
+    #[test]
+    fn palette_change_rebuilds_cached_texture_tiles() {
+        let mut screen = TextScreen::new(Size::new(1, 1));
+        let mut attribute = TextAttribute::default();
+        attribute.set_foreground_ext(4);
+        screen.set_char(icy_engine::Position::new(0, 0), AttributedChar::new(219 as char, attribute));
+
+        let screen: Arc<Mutex<Box<dyn Screen>>> = Arc::new(Mutex::new(Box::new(screen)));
+        let terminal = Terminal::new(screen.clone());
+        let settings = Arc::new(MonitorSettings::default());
+        let program = CRTShaderProgram::new(&terminal, settings, None);
+        let state = CRTShaderState::new(icy_engine::BufferType::CP437);
+        let bounds = Rectangle::new(icy_ui::Point::ORIGIN, icy_ui::Size::new(8.0, 16.0));
+
+        let before = program.internal_draw(&state, mouse::Cursor::Unavailable, bounds);
+
+        {
+            let mut screen = screen.lock();
+            let editable = screen.as_editable().unwrap();
+            ScreenSink::new(editable).operating_system_command(OperatingSystemCommand::SetPaletteColor(4, 12, 34, 56));
+        }
+
+        let after = program.internal_draw(&state, mouse::Cursor::Unavailable, bounds);
+
+        assert_ne!(before.render_generation, after.render_generation);
+        assert_ne!(before.slices_blink_off[0].rgba_data, after.slices_blink_off[0].rgba_data);
+    }
+}

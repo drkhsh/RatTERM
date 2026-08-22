@@ -2202,7 +2202,8 @@ impl TerminalThread {
             }
             TerminalRequest::OscPaletteColorReport { index } => {
                 let screen = self.edit_screen.lock();
-                let (r, g, b) = screen.palette().rgb(u32::from(*index));
+                let palette_index = icy_engine::ansi_to_internal_palette_index(u32::from(*index));
+                let (r, g, b) = screen.palette().rgb(palette_index);
                 Some(
                     format!(
                         "\x1B]4;{};rgb:{:04x}/{:04x}/{:04x}\x1B\\",

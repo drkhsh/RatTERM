@@ -1,6 +1,6 @@
 //! Unit tests for TextScreen - testing Screen and EditableScreen trait implementations
 
-use icy_engine::{AttributedChar, EditableScreen, IceMode, Position, Screen, ScreenSink, Selection, Size, TextAttribute, TextPane, TextScreen};
+use icy_engine::{AttributedChar, EditableScreen, IceMode, Position, Rectangle, RenderOptions, Screen, ScreenSink, Selection, Size, TextAttribute, TextPane, TextScreen};
 use icy_parser_core::{AnsiParser, CommandParser, CommandSink, OperatingSystemCommand};
 
 // ============================================================================
@@ -38,6 +38,33 @@ fn test_osc8_hyperlink_survives_sink_boundary_and_wraps() {
     assert_eq!(screen.hyperlinks()[0].length, 4);
     assert_eq!(screen.hyperlinks()[0].url.as_deref(), Some("https://example.com"));
     assert!(!screen.caret().attribute.is_underlined());
+}
+
+#[test]
+fn test_osc4_palette_change_marks_screen_dirty() {
+    let mut screen = TextScreen::new(Size::new(2, 1));
+    let mut base_attribute = TextAttribute::default();
+    base_attribute.set_foreground(1);
+    screen.set_char(Position::new(0, 0), AttributedChar::new(219 as char, base_attribute));
+    let mut extended_attribute = TextAttribute::default();
+    extended_attribute.set_foreground_ext(4);
+    screen.set_char(Position::new(1, 0), AttributedChar::new(219 as char, extended_attribute));
+
+    let region = Rectangle::from(0, 0, screen.resolution().width, screen.resolution().height);
+    let options = RenderOptions::from(region);
+    let (_, pixels_before) = screen.render_text_region_to_rgba_raw(region, &options);
+
+    screen.clear_dirty_lines();
+    assert_eq!(screen.get_dirty_lines(), None);
+
+    ScreenSink::new(&mut screen).operating_system_command(OperatingSystemCommand::SetPaletteColor(4, 12, 34, 56));
+
+    assert_eq!(screen.palette().color(1).rgb(), (12, 34, 56));
+    assert_eq!(screen.get_dirty_lines(), Some((0, 1)));
+
+    let (_, pixels_after) = screen.render_text_region_to_rgba_raw(region, &options);
+    assert_ne!(pixels_before, pixels_after);
+    assert!(pixels_after.chunks_exact(4).any(|pixel| pixel == [12, 34, 56, 255]));
 }
 
 #[test]

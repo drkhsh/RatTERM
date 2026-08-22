@@ -1190,21 +1190,25 @@ impl CommandSink for ScreenSink<'_> {
                 }
             }
             OperatingSystemCommand::SetPaletteColor(index, r, g, b) => {
-                // Set palette color
-                self.screen.palette_mut().set_color_rgb(index as u32, r, g, b);
+                let palette_index = crate::ansi_to_internal_palette_index(index as u32);
+                self.screen.palette_mut().set_color_rgb(palette_index, r, g, b);
+                self.screen.mark_dirty();
                 log::debug!("OSC: Set palette color {index} to RGB({r}, {g}, {b})");
             }
             OperatingSystemCommand::ResetPaletteColors(indices) => {
                 if indices.is_empty() {
                     for (index, (_, color)) in crate::XTERM_256_PALETTE.iter().enumerate() {
-                        self.screen.palette_mut().set_color(index as u32, color.clone());
+                        let palette_index = crate::ansi_to_internal_palette_index(index as u32);
+                        self.screen.palette_mut().set_color(palette_index, color.clone());
                     }
                 } else {
                     for index in indices {
                         let color = crate::XTERM_256_PALETTE[index as usize].1.clone();
-                        self.screen.palette_mut().set_color(index as u32, color);
+                        let palette_index = crate::ansi_to_internal_palette_index(index as u32);
+                        self.screen.palette_mut().set_color(palette_index, color);
                     }
                 }
+                self.screen.mark_dirty();
             }
             OperatingSystemCommand::Hyperlink { params, uri } => {
                 if let (Ok(_params_str), Ok(uri_str)) = (std::str::from_utf8(&params), std::str::from_utf8(&uri)) {
