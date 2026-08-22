@@ -233,6 +233,7 @@ fn dec_mode_report_status(screen: &dyn Screen, mode: u16) -> u8 {
         1016 => Some(matches!(state.mouse_state.extended_mode, icy_engine::ExtMouseMode::PixelPosition)),
         1070 => Some(!state.sixel_shared_palette),
         2004 => Some(state.bracketed_paste_mode),
+        2026 => Some(state.synchronized_output()),
         _ => None,
     })
 }
@@ -2879,6 +2880,24 @@ mod tests {
         tokio::fs::remove_dir_all(root).await.unwrap();
     }
 
+    #[tokio::test]
+    async fn synchronized_output_round_trips_over_the_wire() {
+        let (mut terminal, sent, screen) = test_terminal();
+
+        terminal.process_data(b"\x1b[?2026h").await;
+        assert!(screen.lock().terminal_state().synchronized_output());
+
+        terminal.process_data(b"\x1b[?2026$p").await;
+        assert_eq!(&*sent.lock(), b"\x1B[?2026;1$y");
+
+        terminal.process_data(b"\x1b[?2026l").await;
+        assert!(!screen.lock().terminal_state().synchronized_output());
+
+        sent.lock().clear();
+        terminal.process_data(b"\x1b[?2026$p").await;
+        assert_eq!(&*sent.lock(), b"\x1B[?2026;2$y");
+    }
+
     #[test]
     fn decrqm_reports_live_and_unknown_modes() {
         let mut screen = TextScreen::new(Size::new(80, 25));
@@ -2887,6 +2906,7 @@ mod tests {
         assert_eq!(dec_mode_report_status(&screen, 80), 2);
         assert_eq!(dec_mode_report_status(&screen, 1070), 1);
         assert_eq!(dec_mode_report_status(&screen, 2004), 2);
+        assert_eq!(dec_mode_report_status(&screen, 2026), 2);
         assert_eq!(dec_mode_report_status(&screen, 9999), 0);
 
         screen.caret_mut().insert_mode = true;
@@ -2894,11 +2914,13 @@ mod tests {
         screen.terminal_state_mut().bracketed_paste_mode = true;
         screen.terminal_state_mut().sixel_at_cursor = false;
         screen.terminal_state_mut().sixel_shared_palette = true;
+        screen.terminal_state_mut().set_synchronized_output(true);
         assert_eq!(ansi_mode_report_status(&screen, 4), 1);
         assert_eq!(dec_mode_report_status(&screen, 25), 2);
         assert_eq!(dec_mode_report_status(&screen, 80), 1);
         assert_eq!(dec_mode_report_status(&screen, 1070), 2);
         assert_eq!(dec_mode_report_status(&screen, 2004), 1);
+        assert_eq!(dec_mode_report_status(&screen, 2026), 1);
     }
 
     #[test]

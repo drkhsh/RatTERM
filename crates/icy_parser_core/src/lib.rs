@@ -374,6 +374,13 @@ pub enum DecMode {
     /// Private Sixel Color Registers (Mode 1070)
     /// Set resets colors per image; reset shares registers between images.
     SixelPrivatePalette = 1070,
+
+    /// Synchronized Output (Mode 2026)
+    ///
+    /// When set (BSU): the terminal keeps presenting the frame it last
+    /// rendered while it continues to process incoming data.
+    /// When reset (ESU): the pending screen state becomes visible again.
+    SynchronizedOutput = 2026,
 }
 
 impl DecMode {
@@ -401,6 +408,7 @@ impl DecMode {
             1015 => Some(Self::ExtendedMouseURXVT),
             1016 => Some(Self::ExtendedMousePixel),
             1070 => Some(Self::SixelPrivatePalette),
+            2026 => Some(Self::SynchronizedOutput),
             _ => None,
         }
     }

@@ -502,6 +502,9 @@ impl<'a> ScreenSink<'a> {
                 state.sixel_shared_palette = !enabled;
                 state.sixel_decoder.reset_palette();
             }
+            DecMode::SynchronizedOutput => {
+                self.screen.terminal_state_mut().set_synchronized_output(enabled);
+            }
         }
     }
 

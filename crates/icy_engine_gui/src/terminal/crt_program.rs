@@ -8,7 +8,7 @@ use crate::{
     compute_viewport_auto, compute_viewport_manual, get_scale_factor,
     shared_render_cache::{SharedCachedTile, TileCacheKey, TILE_HEIGHT},
     tile_cache::MAX_TEXTURE_SLICES,
-    CRTShaderState, MonitorSettings, Terminal, TerminalMessage, TerminalMouseEvent, TerminalShader, TextureSliceData,
+    CRTShaderState, CaretFrame, MonitorSettings, Terminal, TerminalMessage, TerminalMouseEvent, TerminalShader, TextureSliceData,
 };
 use icy_engine::{CaretShape, EditableScreen, KeyModifiers, MouseButton};
 use icy_ui::widget::shader;
@@ -222,6 +222,10 @@ impl<'a> CRTShaderProgram<'a> {
             let screen_type_changed = state.update_cached_screen_info(&**screen);
             *state.cached_mouse_state.lock() = Some(screen.terminal_state().mouse_state.clone());
 
+            // DEC mode 2026: keep presenting the frame the application last
+            // finished while it writes the next one.
+            let synchronized = screen.terminal_state().synchronized_output_active();
+
             char_blink_supported = screen.ice_mode().has_blink();
             blink_on = if char_blink_supported { state.character_blink.is_on() } else { false };
 
@@ -398,8 +402,11 @@ impl<'a> CRTShaderProgram<'a> {
                     cache.invalidate();
                 }
 
-                // Selective tile invalidation based on dirty lines
-                if let Some((first_dirty_line, last_dirty_line)) = screen.get_dirty_lines() {
+                // Selective tile invalidation based on dirty lines.
+                // A synchronized update leaves the range pending, so everything
+                // it touched repaints in one go once the update ends.
+                let dirty_lines = if synchronized { None } else { screen.get_dirty_lines() };
+                if let Some((first_dirty_line, last_dirty_line)) = dirty_lines {
                     // Calculate tile indices from dirty line range
                     let tile_height = crate::TILE_HEIGHT;
                     let font_height = screen.font_dimensions().height.max(1) as u32;
@@ -475,7 +482,12 @@ impl<'a> CRTShaderProgram<'a> {
 
             // Compute caret position for shader rendering
             // This must happen AFTER cache invalidation to ensure caret state matches buffer state
-            {
+            if let Some(frozen) = synchronized.then(|| *state.last_caret.lock()).flatten() {
+                caret_pos = frozen.pos;
+                caret_size = frozen.size;
+                caret_visible = frozen.visible;
+                caret_mode = frozen.mode;
+            } else {
                 let caret = screen.caret();
                 let should_draw = caret.visible && (!caret.blinking || state.caret_blink.is_on()) && self.term.has_focus;
 
@@ -527,6 +539,13 @@ impl<'a> CRTShaderProgram<'a> {
                         };
                     }
                 }
+
+                *state.last_caret.lock() = Some(CaretFrame {
+                    pos: caret_pos,
+                    size: caret_size,
+                    visible: caret_visible,
+                    mode: caret_mode,
+                });
             }
 
             // Calculate which tiles we need based on scroll position
@@ -884,6 +903,7 @@ impl<'a> CRTShaderProgram<'a> {
         // This avoids a perpetual redraw loop when nothing is blinking.
         let mut char_blink_supported = true;
         let mut caret_blink_requested = false;
+        let mut synchronized_frame: Option<Duration> = None;
 
         if let Some(screen) = self.term.screen.try_lock() {
             let buffer_type = screen.buffer_type();
@@ -895,6 +915,10 @@ impl<'a> CRTShaderProgram<'a> {
 
             let caret = screen.caret();
             caret_blink_requested = caret.visible && caret.blinking && self.term.has_focus;
+
+            // Keep frames coming so a synchronized update that is never closed
+            // still reaches the screen when it times out.
+            synchronized_frame = screen.terminal_state().synchronized_output_remaining();
         }
 
         if caret_blink_requested {
@@ -967,6 +991,10 @@ impl<'a> CRTShaderProgram<'a> {
                 (Some(a), None) => Some(a),
                 (None, Some(b)) => Some(b),
                 (None, None) => None,
+            };
+            let next_frame = match (next_frame, synchronized_frame) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
             };
 
             if let Some(delay) = next_frame {
@@ -1214,7 +1242,7 @@ impl<'a> shader::Program<TerminalMessage> for CRTShaderProgram<'a> {
 mod tests {
     use super::*;
     use icy_engine::{AttributedChar, Screen, ScreenSink, Size, TextAttribute, TextScreen};
-    use icy_parser_core::{CommandSink, OperatingSystemCommand};
+    use icy_parser_core::{CommandSink, DecMode, OperatingSystemCommand, TerminalCommand};
     use parking_lot::Mutex;
 
     #[test]
@@ -1237,6 +1265,45 @@ mod tests {
             let mut screen = screen.lock();
             let editable = screen.as_editable().unwrap();
             ScreenSink::new(editable).operating_system_command(OperatingSystemCommand::SetPaletteColor(4, 12, 34, 56));
+        }
+
+        let after = program.internal_draw(&state, mouse::Cursor::Unavailable, bounds);
+
+        assert_ne!(before.render_generation, after.render_generation);
+        assert_ne!(before.slices_blink_off[0].rgba_data, after.slices_blink_off[0].rgba_data);
+    }
+
+    #[test]
+    fn synchronized_output_holds_the_frame_until_it_ends() {
+        let screen: Arc<Mutex<Box<dyn Screen>>> = Arc::new(Mutex::new(Box::new(TextScreen::new(Size::new(1, 1)))));
+        let terminal = Terminal::new(screen.clone());
+        let settings = Arc::new(MonitorSettings::default());
+        let program = CRTShaderProgram::new(&terminal, settings, None);
+        let state = CRTShaderState::new(icy_engine::BufferType::CP437);
+        let bounds = Rectangle::new(icy_ui::Point::ORIGIN, icy_ui::Size::new(8.0, 16.0));
+
+        let before = program.internal_draw(&state, mouse::Cursor::Unavailable, bounds);
+
+        {
+            let mut screen = screen.lock();
+            let editable = screen.as_editable().unwrap();
+            ScreenSink::new(editable).emit(TerminalCommand::CsiDecSetMode(DecMode::SynchronizedOutput, true));
+            let mut attribute = TextAttribute::default();
+            attribute.set_foreground(4);
+            editable.set_char(icy_engine::Position::new(0, 0), AttributedChar::new(219 as char, attribute));
+            editable.mark_dirty();
+        }
+
+        let during = program.internal_draw(&state, mouse::Cursor::Unavailable, bounds);
+
+        assert_eq!(before.render_generation, during.render_generation);
+        assert_eq!(before.slices_blink_off[0].rgba_data, during.slices_blink_off[0].rgba_data);
+
+        // Ending the update must repaint from the range that stayed pending.
+        {
+            let mut screen = screen.lock();
+            let editable = screen.as_editable().unwrap();
+            ScreenSink::new(editable).emit(TerminalCommand::CsiDecSetMode(DecMode::SynchronizedOutput, false));
         }
 
         let after = program.internal_draw(&state, mouse::Cursor::Unavailable, bounds);

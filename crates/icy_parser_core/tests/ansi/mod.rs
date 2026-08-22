@@ -202,6 +202,17 @@ fn test_bracketed_paste_mode() {
 }
 
 #[test]
+fn test_synchronized_output_mode() {
+    let mut parser = AnsiParser::new();
+    let mut sink = CollectSink::new();
+
+    parser.parse(b"\x1B[?2026h\x1B[?2026l", &mut sink);
+
+    assert_eq!(sink.cmds[0], TerminalCommand::CsiDecSetMode(DecMode::SynchronizedOutput, true));
+    assert_eq!(sink.cmds[1], TerminalCommand::CsiDecSetMode(DecMode::SynchronizedOutput, false));
+}
+
+#[test]
 fn test_last_column_flag_modes() {
     let mut parser = AnsiParser::new();
     let mut sink = CollectSink::new();

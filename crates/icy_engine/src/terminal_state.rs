@@ -1,6 +1,14 @@
 use icy_parser_core::BaudEmulation;
 
+use std::time::{Duration, Instant};
+
 use crate::{Position, Size};
+
+/// Longest a synchronized update (DEC mode 2026) may withhold the screen.
+///
+/// Caps the damage of an application that never sends the closing sequence,
+/// which would otherwise freeze the view for good.
+pub const SYNCHRONIZED_OUTPUT_TIMEOUT: Duration = Duration::from_millis(150);
 
 /// Saved DECSTBM/DECSLRM state: origin mode, top/bottom margins, left/right margins, and left/right margin mode.
 type SavedTextWindow = (OriginMode, Option<(i32, i32)>, Option<(i32, i32)>, bool);
@@ -161,6 +169,9 @@ pub struct TerminalState {
     pub sixel_shared_palette: bool,
     pub sixel_decoder: icy_sixel::SixelDecoder,
 
+    /// Start of the running synchronized update (DEC mode 2026), if any.
+    synchronized_output_since: Option<Instant>,
+
     pub font_selection_state: FontSelectionState,
 
     pub normal_attribute_font_slot: usize,
@@ -246,6 +257,7 @@ impl TerminalState {
             sixel_at_cursor: true,
             sixel_shared_palette: false,
             sixel_decoder: icy_sixel::SixelDecoder::new(),
+            synchronized_output_since: None,
             margins_top_bottom: None,
             margins_left_right: None,
             saved_text_window: None,
@@ -491,6 +503,28 @@ impl TerminalState {
         self.clear_margins_left_right();
     }
 
+    /// DEC mode 2026: begin (BSU) or end (ESU) a synchronized update.
+    pub fn set_synchronized_output(&mut self, enabled: bool) {
+        self.synchronized_output_since = enabled.then(Instant::now);
+    }
+
+    /// Mode state as reported by DECRQM, ignoring the timeout.
+    pub fn synchronized_output(&self) -> bool {
+        self.synchronized_output_since.is_some()
+    }
+
+    /// Whether the renderer should still hold back screen updates.
+    pub fn synchronized_output_active(&self) -> bool {
+        self.synchronized_output_remaining().is_some()
+    }
+
+    /// Time left before a stalled synchronized update is forced to the screen,
+    /// or `None` once it ended or timed out.
+    pub fn synchronized_output_remaining(&self) -> Option<Duration> {
+        self.synchronized_output_since
+            .and_then(|since| SYNCHRONIZED_OUTPUT_TIMEOUT.checked_sub(since.elapsed()))
+    }
+
     pub fn reset_terminal(&mut self, size: Size) {
         // Update size first (tab stops depend on width)
         self.size = size;
@@ -505,6 +539,7 @@ impl TerminalState {
         self.sixel_at_cursor = true;
         self.sixel_shared_palette = false;
         self.sixel_decoder.reset_palette();
+        self.synchronized_output_since = None;
         if !self.last_column_flag_forced {
             self.last_column_flag_mode = false;
         }

@@ -1,6 +1,8 @@
 //! Unit tests for TextScreen - testing Screen and EditableScreen trait implementations
 
-use icy_engine::{AttributedChar, EditableScreen, IceMode, Position, Rectangle, RenderOptions, Screen, ScreenSink, Selection, Size, TextAttribute, TextPane, TextScreen};
+use icy_engine::{
+    AttributedChar, EditableScreen, IceMode, Position, Rectangle, RenderOptions, Screen, ScreenSink, Selection, Size, TextAttribute, TextPane, TextScreen,
+};
 use icy_parser_core::{AnsiParser, CommandParser, CommandSink, OperatingSystemCommand};
 
 // ============================================================================

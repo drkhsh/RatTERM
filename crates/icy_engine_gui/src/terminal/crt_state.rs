@@ -25,6 +25,16 @@ pub mod selection_colors {
     pub const SUBTRACT: [f32; 4] = [1.0, 0.5, 0.5, 1.0];
 }
 
+/// Caret as handed to the shader, kept so a synchronized update (DEC mode
+/// 2026) can keep presenting the caret of the last completed frame.
+#[derive(Clone, Copy)]
+pub struct CaretFrame {
+    pub pos: [f32; 2],
+    pub size: [f32; 2],
+    pub visible: bool,
+    pub mode: u8,
+}
+
 /// Cached screen info for mouse mapping calculations and cache invalidation
 /// Updated during internal_draw to avoid extra locks in internal_update
 pub struct CachedScreenInfo {
@@ -107,6 +117,9 @@ pub struct CRTShaderState {
     /// Cached screen info from last draw (font dimensions, screen size, etc.)
     pub cached_screen_info: parking_lot::Mutex<CachedScreenInfo>,
 
+    /// Caret of the most recently presented frame (see `CaretFrame`).
+    pub last_caret: parking_lot::Mutex<Option<CaretFrame>>,
+
     pub instance_id: u64,
     pub render_generation: AtomicU64,
 
@@ -139,6 +152,7 @@ impl CRTShaderState {
             last_move_pixel_position: None,
             cached_mouse_state: parking_lot::Mutex::new(None),
             cached_screen_info: parking_lot::Mutex::new(CachedScreenInfo::default()),
+            last_caret: parking_lot::Mutex::new(None),
             instance_id: TERMINAL_SHADER_INSTANCE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             render_generation: AtomicU64::new(0),
             unicode_glyph_cache: Arc::new(parking_lot::Mutex::new(None)),
@@ -276,6 +290,7 @@ impl Default for CRTShaderState {
             last_move_pixel_position: None,
             cached_mouse_state: parking_lot::Mutex::new(None),
             cached_screen_info: parking_lot::Mutex::new(CachedScreenInfo::default()),
+            last_caret: parking_lot::Mutex::new(None),
             instance_id: TERMINAL_SHADER_INSTANCE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             render_generation: AtomicU64::new(0),
             unicode_glyph_cache: Arc::new(parking_lot::Mutex::new(None)),
