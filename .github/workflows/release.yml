@@ -27,6 +27,8 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # audiopus_sys bundles Opus with cmake_minimum_required < 3.5, which CMake 4 rejects.
+  CMAKE_POLICY_VERSION_MINIMUM: "3.5"
   TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
