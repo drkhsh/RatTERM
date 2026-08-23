@@ -18,6 +18,8 @@ pub struct AnsiParser {
     parse_buffer: Vec<u8>,
     last_char: u8,
     macros: std::collections::HashMap<usize, Vec<u8>>,
+    /// One bit per macro slot, set while that macro is running.
+    in_macro: u64,
 
     // ANSI Music support
     pub music_option: music::MusicOption,
@@ -37,6 +39,7 @@ impl Default for AnsiParser {
             parse_buffer: Vec::new(),
             last_char: 0,
             macros: std::collections::HashMap::new(),
+            in_macro: 0,
             music_option: music::MusicOption::Off,
             music_state: music::MusicState::Default,
             cur_music: None,
@@ -79,6 +82,11 @@ enum ParserState {
 }
 
 impl AnsiParser {
+    /// Highest addressable macro slot, matching the 64 slots SyncTERM provides.
+    const MAX_MACRO_ID: usize = 63;
+    /// SyncTERM's `MAX_MACRO_LEN`.
+    const MAX_MACRO_LEN: usize = 0xF_FFFF;
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -197,24 +205,32 @@ impl AnsiParser {
         let pdt = self.params.get(1).copied().unwrap_or(0);
         let encoding = self.params.get(2).copied().unwrap_or(0);
 
+        if pid > Self::MAX_MACRO_ID {
+            return;
+        }
+
         // pdt = 1 means clear all macros first
         if pdt == 1 {
             self.macros.clear();
+        } else {
+            self.macros.remove(&pid);
         }
 
-        match encoding {
-            0 => {
-                // Text encoding - store as-is
-                self.macros.insert(pid, self.parse_buffer[start_index..].to_vec());
-            }
-            1 => {
-                // Hex encoding - decode it
-                if let Ok(decoded) = self.parse_hex_macro(&self.parse_buffer[start_index..]) {
-                    self.macros.insert(pid, decoded);
-                }
-            }
-            _ => {}
+        let body = match encoding {
+            // Text encoding - store as-is
+            0 => self.parse_buffer[start_index..].to_vec(),
+            // Hex encoding - decode it
+            1 => match self.parse_hex_macro(&self.parse_buffer[start_index..]) {
+                Ok(decoded) => decoded,
+                Err(()) => return,
+            },
+            _ => return,
+        };
+
+        if body.is_empty() || body.len() > Self::MAX_MACRO_LEN {
+            return;
         }
+        self.macros.insert(pid, body);
     }
 
     fn parse_hex_macro(&self, data: &[u8]) -> Result<Vec<u8>, ()> {
@@ -245,6 +261,9 @@ impl AnsiParser {
             } else if in_repeat && data[i] == b';' {
                 // End of repeat section
                 let repeat_data = result[repeat_start..].to_vec();
+                if repeat_data.len().saturating_mul(repeat_count) > Self::MAX_MACRO_LEN {
+                    return Err(());
+                }
                 for _ in 1..repeat_count {
                     result.extend_from_slice(&repeat_data);
                 }
@@ -263,6 +282,9 @@ impl AnsiParser {
 
         if in_repeat {
             let repeat_data = result[repeat_start..].to_vec();
+            if repeat_data.len().saturating_mul(repeat_count) > Self::MAX_MACRO_LEN {
+                return Err(());
+            }
             for _ in 1..repeat_count {
                 result.extend_from_slice(&repeat_data);
             }
@@ -281,8 +303,18 @@ impl AnsiParser {
     }
 
     fn invoke_macro(&mut self, macro_id: usize, sink: &mut dyn CommandSink) {
+        if macro_id > Self::MAX_MACRO_ID {
+            return;
+        }
+        // Refuse a macro that is already running, so cycles cannot recurse forever.
+        let bit = 1u64 << macro_id;
+        if self.in_macro & bit != 0 {
+            return;
+        }
         if let Some(macro_data) = self.macros.get(&macro_id).cloned() {
+            self.in_macro |= bit;
             self.parse(&macro_data, sink);
+            self.in_macro &= !bit;
         }
     }
 
