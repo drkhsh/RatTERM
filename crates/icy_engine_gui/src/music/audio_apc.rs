@@ -480,10 +480,21 @@ pub fn supports_format(major: u32, subtype: u32) -> bool {
     const SF_FORMAT_FLAC: u32 = 0x17;
     const SF_FORMAT_OGG: u32 = 0x20;
     const SF_FORMAT_VORBIS: u32 = 0x60;
+    const SF_FORMAT_PCM_S8: u32 = 0x01;
+    const SF_FORMAT_PCM_16: u32 = 0x02;
+    const SF_FORMAT_PCM_24: u32 = 0x03;
+    const SF_FORMAT_PCM_32: u32 = 0x04;
+    const SF_FORMAT_PCM_U8: u32 = 0x05;
+    const SF_FORMAT_FLOAT: u32 = 0x06;
+    const SF_FORMAT_DOUBLE: u32 = 0x07;
     const SF_FORMAT_OPUS: u32 = 0x64;
 
     match major {
-        SF_FORMAT_WAV | SF_FORMAT_AIFF | SF_FORMAT_FLAC => true,
+        SF_FORMAT_WAV | SF_FORMAT_AIFF => matches!(
+            subtype,
+            SF_FORMAT_PCM_S8 | SF_FORMAT_PCM_16 | SF_FORMAT_PCM_24 | SF_FORMAT_PCM_32 | SF_FORMAT_PCM_U8 | SF_FORMAT_FLOAT | SF_FORMAT_DOUBLE
+        ),
+        SF_FORMAT_FLAC => matches!(subtype, SF_FORMAT_PCM_S8 | SF_FORMAT_PCM_16 | SF_FORMAT_PCM_24),
         SF_FORMAT_OGG => matches!(subtype, SF_FORMAT_VORBIS) || (subtype == SF_FORMAT_OPUS && cfg!(feature = "opus-audio")),
         _ => false,
     }
@@ -1222,6 +1233,7 @@ mod tests {
         // Ogg/Vorbis and plain WAV.
         assert!(supports_format(32, 0x60));
         assert!(supports_format(1, 2));
+        assert!(!supports_format(1, 0));
         // Unknown container.
         assert!(!supports_format(0x99, 2));
     }
