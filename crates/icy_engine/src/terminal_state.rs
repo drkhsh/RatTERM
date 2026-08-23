@@ -54,6 +54,11 @@ impl KittyKeyboardState {
         self.flags() != 0
     }
 
+    /// Number of pushed entries; an app that pops as often as it pushes ends at 0.
+    pub fn depth(&self) -> usize {
+        self.stack.len()
+    }
+
     pub fn contains(&self, flag: u8) -> bool {
         self.flags() & flag != 0
     }

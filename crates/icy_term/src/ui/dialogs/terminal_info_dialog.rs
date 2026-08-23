@@ -1,5 +1,5 @@
 use i18n_embed_fl::fl;
-use icy_engine::{Position, ScreenMode, Size, TerminalScrolling};
+use icy_engine::{KittyKeyboardState, Position, ScreenMode, Size, TerminalScrolling};
 use icy_engine_gui::dialog_wrapper;
 use icy_engine_gui::settings::effect_box;
 use icy_engine_gui::ui::{
@@ -24,6 +24,24 @@ fn yes_no(value: bool) -> &'static str {
         "Yes"
     } else {
         "No"
+    }
+}
+
+/// Decoded progressive-enhancement bits, e.g. `Disambiguate+EventTypes`.
+fn kitty_flags_names(flags: u8) -> String {
+    const NAMES: [(u8, &str); 5] = [
+        (KittyKeyboardState::DISAMBIGUATE, "Disambiguate"),
+        (KittyKeyboardState::REPORT_EVENT_TYPES, "EventTypes"),
+        (KittyKeyboardState::REPORT_ALTERNATE_KEYS, "AlternateKeys"),
+        (KittyKeyboardState::REPORT_ALL_KEYS, "AllKeys"),
+        (KittyKeyboardState::REPORT_ASSOCIATED_TEXT, "AssociatedText"),
+    ];
+
+    let active: Vec<&str> = NAMES.iter().filter(|(bit, _)| flags & bit != 0).map(|(_, name)| *name).collect();
+    if active.is_empty() {
+        "None".to_string()
+    } else {
+        active.join("+")
     }
 }
 
@@ -64,6 +82,7 @@ pub struct TerminalInfo {
     pub mouse_focus_events: bool,
     pub alternate_scroll: bool,
     pub kitty_flags: u8,
+    pub kitty_stack_depth: usize,
     pub sixel_at_cursor: bool,
     pub sixel_shared_palette: bool,
     pub jxl_supported: bool,
@@ -71,6 +90,10 @@ pub struct TerminalInfo {
     pub opus_supported: bool,
     pub audio_active_channels: u32,
     pub lf_expand: bool,
+    pub bracketed_paste: bool,
+    pub synchronized_output: bool,
+    pub origin_within_margins: bool,
+    pub dec_left_right_margins: bool,
     pub inverse_mode: bool,
     pub ice_colors: bool,
     pub baud_emulation: BaudEmulation,
@@ -101,6 +124,7 @@ impl Default for TerminalInfo {
             mouse_focus_events: false,
             alternate_scroll: false,
             kitty_flags: 0,
+            kitty_stack_depth: 0,
             sixel_at_cursor: true,
             sixel_shared_palette: false,
             jxl_supported: true,
@@ -108,6 +132,10 @@ impl Default for TerminalInfo {
             opus_supported: true,
             audio_active_channels: 0,
             lf_expand: true,
+            bracketed_paste: false,
+            synchronized_output: false,
+            origin_within_margins: false,
+            dec_left_right_margins: false,
             inverse_mode: false,
             ice_colors: false,
             baud_emulation: BaudEmulation::Off,
@@ -208,6 +236,8 @@ impl TerminalInfoDialog {
              - Auto Wrap: {}\n\
              - Scroll Mode: {}\n\
              - Margins: {}\n\
+             - Origin Mode: {}\n\
+             - Left/Right Margin Mode: {}\n\
              - Mouse Tracking: {}\n\
              - Mouse Reporting: {}\n\
              - Mouse Encoding: {}\n\
@@ -216,6 +246,8 @@ impl TerminalInfoDialog {
              - Inverse Colors: {}\n\
              - ICE Colors: {}\n\
              - LF Handling: {}\n\
+             - Bracketed Paste: {}\n\
+             - Synchronized Output: {}\n\
              \n\
              Protocols:\n\
              - Kitty Flags: {}\n\
@@ -241,6 +273,8 @@ impl TerminalInfoDialog {
             if self.info.auto_wrap { "Yes" } else { "No" },
             scroll_mode_str,
             margins_str,
+            if self.info.origin_within_margins { "Within Margins" } else { "Upper Left" },
+            if self.info.dec_left_right_margins { "Enabled" } else { "Disabled" },
             self.info.mouse_mode,
             if self.info.mouse_reporting_enabled { "Enabled" } else { "Disabled" },
             self.info.mouse_encoding,
@@ -249,7 +283,14 @@ impl TerminalInfoDialog {
             if self.info.inverse_mode { "Yes" } else { "No" },
             if self.info.ice_colors { "Yes" } else { "No" },
             if self.info.lf_expand { "CR+LF" } else { "LF only" },
-            self.info.kitty_flags,
+            if self.info.bracketed_paste { "On" } else { "Off" },
+            if self.info.synchronized_output { "On" } else { "Off" },
+            format!(
+                "0x{:02X} {} (depth {})",
+                self.info.kitty_flags,
+                kitty_flags_names(self.info.kitty_flags),
+                self.info.kitty_stack_depth
+            ),
             if self.info.sixel_at_cursor { "Cursor" } else { "Origin" },
             if self.info.sixel_shared_palette { "Shared" } else { "Private" },
             if self.info.jxl_supported { "Yes" } else { "No" },
@@ -278,6 +319,26 @@ impl TerminalInfoDialog {
                 .style(|theme: &Theme| text::Style {
                     color: Some(theme.background.on.scale_alpha(0.7)),
                 }),
+        ]
+        .spacing(DIALOG_SPACING)
+        .align_y(Alignment::Center)
+        .into()
+    }
+
+    fn create_row_with_text_tooltip<M: Clone + 'static>(label: String, value: String, hint: String) -> Element<'static, M> {
+        row![
+            text(label).size(TEXT_SIZE_NORMAL).width(Length::Fixed(LABEL_WIDTH)),
+            tooltip(
+                text(value)
+                    .size(TEXT_SIZE_NORMAL)
+                    .width(Length::Fixed(VALUE_WIDTH))
+                    .style(|theme: &Theme| text::Style {
+                        color: Some(theme.background.on.scale_alpha(0.7)),
+                    }),
+                container(text(hint).size(TEXT_SIZE_SMALL)).padding(8).style(container::rounded_box),
+                tooltip::Position::Top,
+            )
+            .gap(5),
         ]
         .spacing(DIALOG_SPACING)
         .align_y(Alignment::Center)
@@ -515,6 +576,14 @@ impl TerminalInfoDialog {
             Self::create_row::<M>(auto_wrap_label, if self.info.auto_wrap { yes_str.clone() } else { no_str.clone() }),
             Self::create_row::<M>(scroll_mode_label, scroll_mode_str.to_string()),
             Self::create_row::<M>(margins_label, margins_str),
+            Self::create_row::<M>(
+                "Origin / DECSLRM".to_string(),
+                format!(
+                    "{} / {}",
+                    if self.info.origin_within_margins { "Margins" } else { "Corner" },
+                    if self.info.dec_left_right_margins { "On" } else { "Off" }
+                )
+            ),
             Self::create_row_with_mouse_mode_tooltip::<M>(
                 mouse_tracking_label,
                 self.info.mouse_mode.clone(),
@@ -558,7 +627,16 @@ impl TerminalInfoDialog {
                         if self.info.mouse_reporting_enabled { "Enabled" } else { "Disabled" }.to_string()
                     ),
                     Self::create_row::<M>("Mouse encoding".to_string(), self.info.mouse_encoding.clone()),
-                    Self::create_row::<M>("Kitty flags".to_string(), self.info.kitty_flags.to_string()),
+                    Self::create_row::<M>(
+                        "Focus / Alt scroll".to_string(),
+                        format!("{} / {}", yes_no(self.info.mouse_focus_events), yes_no(self.info.alternate_scroll))
+                    ),
+                    Self::create_row_with_text_tooltip::<M>(
+                        "Kitty flags".to_string(),
+                        format!("0x{:02X} (depth {})", self.info.kitty_flags, self.info.kitty_stack_depth),
+                        kitty_flags_names(self.info.kitty_flags)
+                    ),
+                    Self::create_row::<M>("Bracketed paste".to_string(), if self.info.bracketed_paste { "On" } else { "Off" }.to_string()),
                     Self::create_row::<M>("LF handling".to_string(), if self.info.lf_expand { "CR+LF" } else { "LF only" }.to_string()),
                 ]
                 .spacing(SPACE_4),
@@ -579,6 +657,7 @@ impl TerminalInfoDialog {
                         format!("{} / {}", yes_no(self.info.jxl_supported), yes_no(self.info.opus_supported))
                     ),
                     Self::create_row::<M>("Audio channels".to_string(), format!("0x{:04X}", self.info.audio_active_channels)),
+                    Self::create_row::<M>("Sync output".to_string(), if self.info.synchronized_output { "On" } else { "Off" }.to_string()),
                 ]
                 .spacing(SPACE_4),
             ]
