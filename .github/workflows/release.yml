@@ -123,6 +123,8 @@ jobs:
       - name: Pack Linux assets
         run: |
           zip -r "${APP}_linux_${VERSION}.zip" "$APP.deb" file_id.diz
+          # The zip keeps the plain name; the standalone asset carries the version.
+          cp "$APP.deb" "${APP}-${VERSION}-amd64.deb"
 
       - name: Attach Linux assets
         env:
@@ -131,7 +133,7 @@ jobs:
         run: |
           gh release upload "$TAG" \
             "${APP}_linux_${VERSION}.zip" \
-            "$APP.deb" \
+            "${APP}-${VERSION}-amd64.deb" \
             "$APP_IMG" \
             --repo "$REPO" --clobber
 
@@ -164,6 +166,8 @@ jobs:
         shell: pwsh
         run: |
           Compress-Archive -Path "$env:APP.exe", "file_id.diz" -DestinationPath "${env:APP}_windows_${env:VERSION}.zip"
+          # The zip keeps the plain name; the standalone asset carries the version.
+          Copy-Item "${env:APP}.exe" "${env:APP}-${env:VERSION}-x86_64.exe"
 
       - name: Attach Windows assets
         shell: bash
@@ -173,7 +177,7 @@ jobs:
         run: |
           gh release upload "$TAG" \
             "${APP}_windows_${VERSION}.zip" \
-            "${APP}.exe" \
+            "${APP}-${VERSION}-x86_64.exe" \
             --repo "$REPO" --clobber
 
   build_mac:
