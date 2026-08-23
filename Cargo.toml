@@ -48,7 +48,7 @@ lazy_static = "1.5.0"
 semver = "1.0.28"
 thiserror = "2.0.20"
 clap = { version = "4.6.6", features = ["derive"] }
-log = "0.4.33"
+log = "0.4.34"
 flexi_logger = "0.31.10"
 chrono = { version = "0.4.45", features = ["serde"] }
 serde = { version = "1.0.229", features = ["derive"] }
@@ -67,7 +67,7 @@ fastrand = "2.5.0"
 base64 = "0.23.1"
 opus = "0.3.1"
 symphonia = { version = "0.5.5", default-features = false, features = ["ogg"] }
-rmcp = "3.1.2"
+rmcp = "3.1.4"
 serde_json = "1.0.151"
 image = "0.25.10"
 jxl-oxide = { version = "0.12.6", features = ["image"] }
@@ -83,6 +83,7 @@ tokio-tungstenite = "0.30.0"
 futures-util = "0.3"
 anstream = "1.0.0"
 rodio = { version = "0.22.2" }
+# Pinned to whatever rodio depends on; a mismatch makes Device types incompatible.
 cpal = "0.17.3"
 # Atari ST GIST sound emulation (IGS)
 ym2149-gist-replayer = "0.9.1"
@@ -96,7 +97,7 @@ string-interner = "0.20.0"
 cascada = "0.3.1"
 gif = "0.14.2"
 quantette = "0.6.0"
-crc32fast = "1.5.0"
+crc32fast = "1.5.1"
 
 # SVG and font rendering
 resvg = "0.48.1"
