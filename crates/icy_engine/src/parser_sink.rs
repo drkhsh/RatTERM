@@ -37,8 +37,6 @@ struct ImageApcOptions {
     sh: Option<u32>,
     dx: i32,
     dy: i32,
-    dw: Option<u32>,
-    dh: Option<u32>,
     flip_x: bool,
     flip_y: bool,
     zoom_x: u32,
@@ -68,8 +66,6 @@ fn parse_image_apc_options<'a>(parts: impl Iterator<Item = &'a str>) -> ImageApc
             "SH" => options.sh = value.parse().ok(),
             "DX" => options.dx = value.parse().unwrap_or(0),
             "DY" => options.dy = value.parse().unwrap_or(0),
-            "DW" => options.dw = value.parse().ok(),
-            "DH" => options.dh = value.parse().ok(),
             "ZX" => options.zoom_x = value.parse().unwrap_or(0),
             "ZY" => options.zoom_y = value.parse().unwrap_or(0),
             _ => {}
@@ -113,23 +109,16 @@ pub fn decode_image_blob(bytes: &[u8], is_jxl: bool, options: &str, font: Size, 
         image = image.flipv();
     }
 
-    if let (Some(width), Some(height)) = (options.dw, options.dh) {
-        if width == 0 || height == 0 || u64::from(width) * u64::from(height) > MAX_PIXELS {
-            return None;
-        }
+    if options.zoom_x == 0 || options.zoom_y == 0 {
+        return None;
+    }
+    let width = image.width().checked_mul(options.zoom_x)?;
+    let height = image.height().checked_mul(options.zoom_y)?;
+    if u64::from(width) * u64::from(height) > MAX_PIXELS {
+        return None;
+    }
+    if options.zoom_x != 1 || options.zoom_y != 1 {
         image = image.resize_exact(width, height, FilterType::Nearest);
-    } else {
-        if options.zoom_x == 0 || options.zoom_y == 0 {
-            return None;
-        }
-        let width = image.width().checked_mul(options.zoom_x)?;
-        let height = image.height().checked_mul(options.zoom_y)?;
-        if u64::from(width) * u64::from(height) > MAX_PIXELS {
-            return None;
-        }
-        if options.zoom_x != 1 || options.zoom_y != 1 {
-            image = image.resize_exact(width, height, FilterType::Nearest);
-        }
     }
 
     let (mut dx, mut dy) = (options.dx, options.dy);
@@ -1324,7 +1313,7 @@ mod tests {
     fn draws_inline_ppm_apc() {
         let ppm = b"P3\n2 1\n255\n255 0 0  0 255 0\n";
         let encoded = general_purpose::STANDARD.encode(ppm);
-        let sequence = format!("\x1B_SyncTERM:C;DrawPPMBlob;DW=4;DH=2;{encoded}\x1B\\");
+        let sequence = format!("\x1B_SyncTERM:C;DrawPPMBlob;ZX=2;ZY=2;{encoded}\x1B\\");
         let mut screen = crate::TextScreen::new((80, 25));
         let mut parser = AnsiParser::new();
 
