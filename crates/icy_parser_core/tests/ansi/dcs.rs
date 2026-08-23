@@ -65,6 +65,29 @@ fn test_nested_dec_macros_parse_from_default_state() {
 }
 
 #[test]
+fn test_unterminated_dcs_payload_is_capped() {
+    let mut parser = AnsiParser::new();
+    let mut sink = CollectSink::new();
+
+    // Open a Sixel DCS and stream past the cap without ever sending ST.
+    parser.parse(b"\x1bPq", &mut sink);
+    let chunk = vec![b'?'; 1024 * 1024];
+    for _ in 0..(AnsiParser::MAX_STRING_LEN / chunk.len() + 2) {
+        parser.parse(&chunk, &mut sink);
+    }
+    parser.parse(b"\x1b\\", &mut sink);
+
+    let Some(DeviceControlString::Sixel { sixel_data, .. }) = sink.dcs_commands.first() else {
+        panic!("Expected Sixel");
+    };
+    assert!(sixel_data.len() <= AnsiParser::MAX_STRING_LEN);
+
+    // The parser still resyncs on the terminator.
+    parser.parse(b"A", &mut sink);
+    assert_eq!(sink.text, b"A");
+}
+
+#[test]
 fn test_self_referential_macro_does_not_recurse() {
     let mut parser = AnsiParser::new();
     let mut sink = CollectSink::new();

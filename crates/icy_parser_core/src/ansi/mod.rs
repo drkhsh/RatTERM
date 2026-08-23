@@ -86,9 +86,20 @@ impl AnsiParser {
     const MAX_MACRO_ID: usize = 63;
     /// SyncTERM's `MAX_MACRO_LEN`.
     const MAX_MACRO_LEN: usize = 0xF_FFFF;
+    /// Ceiling for an OSC/DCS/APS payload, well above any real Sixel or image blob.
+    pub const MAX_STRING_LEN: usize = 32 * 1024 * 1024;
 
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Drops data once the cap is reached, so a peer that never sends ST cannot
+    /// grow the buffer without bound. Scanning continues so the parser still resyncs.
+    fn push_string_data(&mut self, data: &[u8]) {
+        if self.parse_buffer.len().saturating_add(data.len()) > Self::MAX_STRING_LEN {
+            return;
+        }
+        self.parse_buffer.extend_from_slice(data);
     }
 
     /// Set the ANSI music option
@@ -1377,7 +1388,7 @@ impl CommandParser for AnsiParser {
                     if let Some(term_pos) = memchr::memchr2(BELL, ESC, &input[i..]) {
                         let term_byte = input[i + term_pos];
                         // Copy everything up to terminator into parse_buffer
-                        self.parse_buffer.extend_from_slice(&input[i..i + term_pos]);
+                        self.push_string_data(&input[i..i + term_pos]);
 
                         if term_byte == BELL {
                             // BEL - End of OSC
@@ -1396,13 +1407,13 @@ impl CommandParser for AnsiParser {
                                 printable_start = i;
                             } else {
                                 // Collect ESC as part of OSC string
-                                self.parse_buffer.push(ESC);
+                                self.push_string_data(&[ESC]);
                                 i += 1;
                             }
                         }
                     } else {
                         // No terminator found - consume rest of input
-                        self.parse_buffer.extend_from_slice(&input[i..]);
+                        self.push_string_data(&input[i..]);
                         i = input.len();
                     }
                 }
@@ -1411,14 +1422,14 @@ impl CommandParser for AnsiParser {
                     // Use memchr to quickly find the next ESC byte
                     if let Some(esc_pos) = memchr::memchr(ESC, &input[i..]) {
                         // Copy everything up to ESC into parse_buffer
-                        self.parse_buffer.extend_from_slice(&input[i..i + esc_pos]);
+                        self.push_string_data(&input[i..i + esc_pos]);
                         i += esc_pos;
                         // Now we're at ESC - transition to DcsEscape state
                         self.state = ParserState::DcsEscape;
                         i += 1;
                     } else {
                         // No ESC found - consume rest of input
-                        self.parse_buffer.extend_from_slice(&input[i..]);
+                        self.push_string_data(&input[i..]);
                         i = input.len();
                     }
                 }
@@ -1458,14 +1469,12 @@ impl CommandParser for AnsiParser {
 
                         // If we get here, it wasn't a valid macro sequence
                         // Treat the ESC [ and following chars as regular DCS data
-                        self.parse_buffer.push(ESC);
-                        self.parse_buffer.push(b'[');
+                        self.push_string_data(&[ESC, b'[']);
                         // The next iteration will handle the current byte
                         self.state = ParserState::DcsString;
                     } else {
                         // False alarm - ESC was part of DCS data
-                        self.parse_buffer.push(ESC);
-                        self.parse_buffer.push(byte);
+                        self.push_string_data(&[ESC, byte]);
                         self.state = ParserState::DcsString;
                         i += 1;
                     }
@@ -1475,14 +1484,14 @@ impl CommandParser for AnsiParser {
                     // Use memchr to quickly find the next ESC byte
                     if let Some(esc_pos) = memchr::memchr(ESC, &input[i..]) {
                         // Copy everything up to ESC into parse_buffer
-                        self.parse_buffer.extend_from_slice(&input[i..i + esc_pos]);
+                        self.push_string_data(&input[i..i + esc_pos]);
                         i += esc_pos;
                         // Now we're at ESC - transition to ApsEscape state
                         self.state = ParserState::ApsEscape;
                         i += 1;
                     } else {
                         // No ESC found - consume rest of input
-                        self.parse_buffer.extend_from_slice(&input[i..]);
+                        self.push_string_data(&input[i..]);
                         i = input.len();
                     }
                 }
@@ -1500,8 +1509,7 @@ impl CommandParser for AnsiParser {
                         printable_start = i;
                     } else {
                         // False alarm - ESC was part of APS data
-                        self.parse_buffer.push(ESC);
-                        self.parse_buffer.push(byte);
+                        self.push_string_data(&[ESC, byte]);
                         self.state = ParserState::ApsString;
                         i += 1;
                     }
