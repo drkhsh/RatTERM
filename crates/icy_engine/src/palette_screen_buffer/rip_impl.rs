@@ -8,8 +8,8 @@ use std::{
 };
 
 use crate::{
-    bgi::{Bgi, ButtonStyle2, Direction, FontType, LabelOrientation, LineStyle as BgiLineStyle, MouseField, WriteMode as BgiWriteMode},
     AttributedChar, EditableScreen, Position, Result, Size,
+    bgi::{Bgi, ButtonStyle2, Direction, FontType, LabelOrientation, LineStyle as BgiLineStyle, MouseField, WriteMode as BgiWriteMode},
 };
 use byteorder::{LittleEndian, ReadBytesExt};
 use icy_parser_core::{FillStyle, ImagePasteMode, LineStyle, RipCommand, WriteMode as RipWriteMode};
@@ -407,10 +407,10 @@ fn execute_rip_command(buf: &mut dyn EditableScreen, bgi: &mut Bgi, cmd: RipComm
                         break;
                     }
                     let bit = 7 - (x2 & 7);
-                    let mut color = (planes[x2 / 8] >> bit) & 1;
-                    color |= ((planes[row + (x2 / 8)] >> bit) & 1) << 1;
-                    color |= ((planes[(row * 2) + (x2 / 8)] >> bit) & 1) << 2;
-                    color |= ((planes[(row * 3) + (x2 / 8)] >> bit) & 1) << 3;
+                    let mut color = ((planes[x2 / 8] >> bit) & 1) << 3;
+                    color |= ((planes[row + (x2 / 8)] >> bit) & 1) << 2;
+                    color |= ((planes[(row * 2) + (x2 / 8)] >> bit) & 1) << 1;
+                    color |= (planes[(row * 3) + (x2 / 8)] >> bit) & 1;
                     bgi.put_pixel(buf, i32::from(x) + x2 as i32, i32::from(y) + y2, color);
                 }
             }
@@ -487,7 +487,7 @@ fn execute_rip_command(buf: &mut dyn EditableScreen, bgi: &mut Bgi, cmd: RipComm
                     y1.into(),
                     hotkey as u8,
                     flags.into(),
-                    None,
+                    Some(split[0]),
                     split[1],
                     parse_host_command(split[2]),
                     false,

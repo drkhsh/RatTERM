@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use icy_engine::{EditableScreen, ScreenSink};
+use icy_engine::{EditableScreen, PaletteScreenBuffer, ScreenSink};
 use icy_parser_core::{CommandParser, ErrorLevel};
 
 mod ansi;
@@ -25,6 +25,9 @@ pub fn run_parser_compare_no_errors(screen: &mut (Box<dyn EditableScreen>, Box<d
 
 fn run_parser_compare_impl(screen: &mut (Box<dyn EditableScreen>, Box<dyn CommandParser + Send>), src_file: &Path, data: &[u8], fail_on_parser_errors: bool) {
     let screen_ptr = &mut *screen.0;
+    if let (Some(parent), Some(screen)) = (src_file.parent(), screen_ptr.as_any_mut().downcast_mut::<PaletteScreenBuffer>()) {
+        screen.set_file_path(parent.to_path_buf());
+    }
     let mut sink = ScreenSink::new(screen_ptr);
     screen.1.parse(data, &mut sink);
     if fail_on_parser_errors {

@@ -1,6 +1,12 @@
-use std::{f64::consts, path::PathBuf};
+use std::{
+    f64::consts,
+    fs,
+    io::{Cursor, Read},
+    path::PathBuf,
+};
 
-use crate::{BitFont, EditableScreen, Palette, Position, Rectangle, Size, EGA_PALETTE};
+use crate::{BitFont, EGA_PALETTE, EditableScreen, Palette, Position, Rectangle, Size};
+use byteorder::{LittleEndian, ReadBytesExt};
 
 mod character;
 pub use character::*;
@@ -2065,7 +2071,7 @@ impl Bgi {
         mut y2: i32,
         hotkey: u8,
         _flags: i32,
-        _icon_file: Option<&str>,
+        icon_file: Option<&str>,
         text: &str,
         host_command: Option<String>,
         pressed: bool,
@@ -2078,15 +2084,21 @@ impl Bgi {
         let cc = self.button_style.corner_color as u8;
         let br = self.button_style.bright as u8;
 
+        let icon = if self.button_style.is_icon_button() {
+            icon_file.and_then(|file_name| self.load_icon_data(file_name))
+        } else {
+            None
+        };
+
         let mut width = x2 - x1 + 1;
         let mut height = y2 - y1 + 1;
 
         if x2 == 0 {
-            width = self.button_style.size.width;
+            width = icon.as_ref().map_or(self.button_style.size.width, |icon| icon.0);
             x2 = x1 + width - 1;
         }
         if y2 == 0 {
-            height = self.button_style.size.height;
+            height = icon.as_ref().map_or(self.button_style.size.height, |icon| icon.1);
             y2 = y1 + height - 1;
         }
 
@@ -2144,6 +2156,14 @@ impl Bgi {
             }
         }
 
+        if let Some((icon_width, icon_height, pixels)) = icon {
+            for y in 0..icon_height {
+                for x in 0..icon_width {
+                    self.put_pixel(buf, x1 + x, y1 + y, pixels[(y * icon_width + x) as usize]);
+                }
+            }
+        }
+
         // Draw sunken effect (button border)
         if self.button_style.display_sunken_effect() {
             if pressed {
@@ -2154,10 +2174,10 @@ impl Bgi {
                 self.draw_line(buf, x2, y2, x1, y2, br);
             } else {
                 // Normal state
-                self.draw_line(buf, x1, y1, x2, y1, br);
-                self.draw_line(buf, x1, y1, x1, y2, br);
-                self.draw_line(buf, x2, y2, x2, y1, cs);
-                self.draw_line(buf, x2, y2, x1, y2, cs);
+                self.draw_line(buf, x1, y1, x2, y1, cs);
+                self.draw_line(buf, x1, y1, x1, y2, cs);
+                self.draw_line(buf, x2, y2, x2, y1, br);
+                self.draw_line(buf, x2, y2, x1, y2, br);
             }
             self.put_pixel(buf, x1, y1, cc);
             self.put_pixel(buf, x2, y1, cc);
@@ -2169,18 +2189,24 @@ impl Bgi {
         if self.button_style.display_chisel() {
             let (xinset, yinset) = chisel_inset(y2 - y1 + 1);
 
-            if pressed {
-                // Pressed state: inverted chisel colors
-                self.draw_line(buf, x1 + xinset, y1 + yinset, x2 - xinset, y1 + yinset, cs);
-                self.draw_line(buf, x1 + xinset, y1 + yinset, x1 + xinset, y2 - yinset, cs);
+            if pressed || self.button_style.display_sunken_effect() {
+                let left = x1 + xinset;
+                let top = y1 + yinset;
+                let right = x2 - xinset;
+                let bottom = y2 - yinset;
 
-                self.draw_line(buf, x1 + xinset + 1, y2 - yinset, x2 - xinset, y2 - yinset, br);
-                self.draw_line(buf, x2 - xinset, y1 + yinset + 1, x2 - xinset, y2 - yinset, br);
+                self.draw_line(buf, left, top, right, top, cs);
+                self.draw_line(buf, left, top, left, bottom, cs);
+                self.draw_line(buf, left + 1, bottom - 1, right - 1, bottom - 1, cs);
+                self.draw_line(buf, right - 1, top + 2, right - 1, bottom - 1, cs);
+
+                self.draw_line(buf, left + 1, top + 1, right, top + 1, br);
+                self.draw_line(buf, left + 1, top + 1, left + 1, bottom, br);
+                self.draw_line(buf, left + 1, bottom, right, bottom, br);
+                self.draw_line(buf, right, top + 1, right, bottom, br);
             } else {
-                // Normal state
                 self.draw_line(buf, x1 + xinset, y1 + yinset, x2 - xinset, y1 + yinset, br);
                 self.draw_line(buf, x1 + xinset, y1 + yinset, x1 + xinset, y2 - yinset, br);
-
                 self.draw_line(buf, x1 + xinset + 1, y2 - yinset, x2 - xinset, y2 - yinset, cs);
                 self.draw_line(buf, x2 - xinset, y1 + yinset + 1, x2 - xinset, y2 - yinset, cs);
             }
@@ -2231,6 +2257,36 @@ impl Bgi {
             self.render_button_label(buf, &text, tx, ty, hotkey, ch, cs, ul);
             self.set_color(old_col);
         }
+    }
+
+    fn load_icon_data(&self, search_file: &str) -> Option<(i32, i32, Vec<u8>)> {
+        let search_file = search_file.to_uppercase();
+        let path = fs::read_dir(&self.file_path)
+            .ok()?
+            .flatten()
+            .find(|entry| entry.file_name().to_string_lossy().to_uppercase() == search_file)
+            .map(|entry| entry.path())?;
+        let mut data = Vec::new();
+        fs::File::open(path).ok()?.read_to_end(&mut data).ok()?;
+        let mut reader = Cursor::new(data);
+        let width = i32::from(reader.read_u16::<LittleEndian>().ok()?) + 1;
+        let height = i32::from(reader.read_u16::<LittleEndian>().ok()?) + 1;
+        let row_size = (width / 8 + i32::from(width & 7 != 0)) as usize;
+        let mut pixels = Vec::with_capacity((width * height) as usize);
+
+        for _ in 0..height {
+            let mut planes = vec![0; row_size * 4];
+            reader.read_exact(&mut planes).ok()?;
+            for x in 0..width as usize {
+                let bit = 7 - (x & 7);
+                let mut color = ((planes[x / 8] >> bit) & 1) << 3;
+                color |= ((planes[row_size + x / 8] >> bit) & 1) << 2;
+                color |= ((planes[row_size * 2 + x / 8] >> bit) & 1) << 1;
+                color |= (planes[row_size * 3 + x / 8] >> bit) & 1;
+                pixels.push(color);
+            }
+        }
+        Some((width, height, pixels))
     }
 }
 
