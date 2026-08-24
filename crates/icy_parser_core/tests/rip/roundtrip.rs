@@ -284,7 +284,19 @@ fn test_copy_region() {
 
 #[test]
 fn test_read_scene() {
-    test_roundtrip("|1R00000000testfile.rip");
+    let input = "!|1R00000000testfile.rip\n";
+    let mut parser = RipParser::new();
+    let mut sink = TestSink::new();
+    parser.parse(input.as_bytes(), &mut sink);
+
+    assert_eq!(
+        sink.rip_commands,
+        [RipCommand::ReadScene {
+            res: 0,
+            file_name: "testfile.rip".to_string(),
+        }]
+    );
+    assert_eq!(sink.rip_commands[0].to_string(), "|1R00000000testfile.rip");
 }
 
 #[test]

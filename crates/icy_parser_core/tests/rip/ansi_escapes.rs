@@ -93,6 +93,16 @@ fn test_rip_enable() {
 }
 
 #[test]
+fn test_rip_enable_preserves_following_input() {
+    let mut parser = RipParser::new();
+    let mut sink = TestSink::new();
+
+    parser.parse(b"\x1B[1!\x1B[2!\n!|c05\n", &mut sink);
+
+    assert_eq!(sink.rip_commands, [RipCommand::Color { c: 5 }]);
+}
+
+#[test]
 fn test_rip_unknown_ansi_sequence_passthrough() {
     let mut parser = RipParser::new();
     let mut sink = TestSink::new();

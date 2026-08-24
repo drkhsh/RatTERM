@@ -29,12 +29,27 @@ impl RipParser {
                 // Immediate commands - complete immediately
                 self.emit_command(sink);
                 self.builder.reset();
-                self.state = State::GotExclaim;
+                self.state = State::RipLine;
                 return true;
             }
 
             // Text commands (consume rest as string)
-            (0, b'T') | (0, b'$') | (1, b'R') => {
+            (0, b'T') | (0, b'$') => {
+                self.builder.string_param.push(ch);
+                Ok(false)
+            }
+
+            // ReadScene: res(8) then filename string
+            (1, b'R') if self.builder.param_state < 8 => {
+                if let Some(digit) = BASE36_LUT[ch as usize] {
+                    self.builder.u64_param = self.builder.u64_param * 36 + u64::from(digit);
+                    self.builder.param_state += 1;
+                    Ok(false)
+                } else {
+                    Err(())
+                }
+            }
+            (1, b'R') => {
                 self.builder.string_param.push(ch);
                 Ok(false)
             }
@@ -385,9 +400,9 @@ impl RipParser {
                 Ok(false)
             }
 
-            // ButtonStyle: 37 states total (0..36)
-            // states 0..=35: parse 2-digit pairs for first 3 params, then 4-digit flags, then 2-digit pairs for remaining params, then 7-digit res
-            // state 36: done
+            // ButtonStyle: 36 digits total (states 0..35)
+            // Parse 2-digit pairs for the first 3 params, 4-digit flags,
+            // 2-digit pairs for the remaining params, then 6-digit res.
             (1, b'B') => {
                 if let Some(digit) = BASE36_LUT[ch as usize] {
                     let state = self.builder.param_state;
@@ -424,8 +439,8 @@ impl RipParser {
                             self.builder.u16_params[idx] = self.builder.u16_params[idx].wrapping_mul(36).wrapping_add(digit);
                         }
                     }
-                    // states 30-36: res (7 digits, param 14)
-                    else if state <= 36 {
+                    // states 30-35: res (6 digits, param 14)
+                    else if state <= 35 {
                         let idx = 14;
                         if self.builder.u16_params.len() <= idx {
                             self.builder.u16_params.resize(idx + 1, 0);
@@ -434,7 +449,7 @@ impl RipParser {
                     }
 
                     self.builder.param_state += 1;
-                    Ok(self.builder.param_state > 36)
+                    Ok(self.builder.param_state > 35)
                 } else {
                     Err(())
                 }
@@ -539,7 +554,7 @@ impl RipParser {
                 // Command complete
                 self.emit_command(sink);
                 self.builder.reset();
-                self.state = State::GotExclaim;
+                self.state = State::RipLine;
                 true
             }
             Ok(false) => {

@@ -376,7 +376,8 @@ impl RipParser {
                 res: self.builder.u16_params[4],
                 dest_line: self.builder.u16_params[5],
             },
-            (1, b'R') => RipCommand::ReadScene {
+            (1, b'R') if self.builder.param_state >= 8 => RipCommand::ReadScene {
+                res: self.builder.u64_param,
                 file_name: self.builder.take_string(),
             },
             (1, b'F') if self.builder.u16_params.len() >= 2 => {

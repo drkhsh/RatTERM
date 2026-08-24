@@ -1990,7 +1990,11 @@ impl Bgi {
     }
 
     pub fn set_viewport(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) {
-        self.viewport = Rectangle::from(x0, y0, x1 - x0, y1 - y0);
+        self.viewport = if x0 == 0 && y0 == 0 && x1 == 0 && y1 == 0 {
+            Rectangle::from(0, 0, 0, 0)
+        } else {
+            Rectangle::from(x0, y0, x1 - x0 + 1, y1 - y0 + 1)
+        };
     }
     pub fn clear_viewport(&mut self, buf: &mut dyn EditableScreen) {
         self.bar_rect(buf, self.viewport);

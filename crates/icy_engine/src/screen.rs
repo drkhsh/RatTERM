@@ -214,6 +214,10 @@ pub trait Screen: TextPane + Send + Sync {
 /// Trait for screens that can be edited
 /// Extends Screen with editing operations
 pub trait EditableScreen: Screen {
+    fn text_output_enabled(&self) -> bool {
+        true
+    }
+
     // Utility methods for editing operations
     fn first_visible_line(&self) -> i32;
     fn last_visible_line(&self) -> i32;

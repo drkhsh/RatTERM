@@ -9,12 +9,29 @@ use std::{
 
 use crate::{
     bgi::{Bgi, ButtonStyle2, Direction, FontType, LabelOrientation, LineStyle as BgiLineStyle, MouseField, WriteMode as BgiWriteMode},
-    EditableScreen, Position, Result, Size,
+    AttributedChar, EditableScreen, Position, Result, Size,
 };
 use byteorder::{LittleEndian, ReadBytesExt};
 use icy_parser_core::{FillStyle, ImagePasteMode, LineStyle, RipCommand, WriteMode as RipWriteMode};
 pub const RIP_SCREEN_SIZE: Size = Size { width: 640, height: 350 };
 pub static RIP_TERMINAL_ID: &str = "RIPSCRIP015410\0";
+
+fn active_text_window(buf: &dyn EditableScreen) -> Option<(i32, i32, i32, i32)> {
+    let (left, right) = buf.terminal_state().margins_left_right()?;
+    let (top, bottom) = buf.terminal_state().margins_top_bottom()?;
+    Some((left, top, right, bottom))
+}
+
+fn clear_text_cells(buf: &mut dyn EditableScreen, bgi: &Bgi, left: i32, top: i32, right: i32, bottom: i32) {
+    let mut attribute = buf.caret().attribute;
+    attribute.set_background(bgi.get_bk_color().into());
+    let blank = AttributedChar::new(' ', attribute);
+    for y in top..=bottom {
+        for x in left..=right {
+            buf.set_char(Position::new(x, y), blank);
+        }
+    }
+}
 
 // Helper function that takes mutable references separately to avoid borrow checker issues
 fn execute_rip_command(buf: &mut dyn EditableScreen, bgi: &mut Bgi, cmd: RipCommand) {
@@ -22,14 +39,19 @@ fn execute_rip_command(buf: &mut dyn EditableScreen, bgi: &mut Bgi, cmd: RipComm
         // Level 0 commands
         RipCommand::TextWindow { x0, y0, x1, y1, wrap, size } => {
             if x0 == 0 && y0 == 0 && x1 == 0 && y1 == 0 && size == 0 && !wrap {
-                bgi.suspend_text = !bgi.suspend_text;
+                bgi.suspend_text = true;
                 buf.terminal_state_mut().reset_text_window();
                 buf.set_caret_position((0, 0).into());
                 return;
             }
+            bgi.suspend_text = false;
+            let font_page = size.clamp(0, 4) as u8;
+            let unchanged = active_text_window(buf) == Some((x0.into(), y0.into(), x1.into(), y1.into())) && buf.caret().font_page() == font_page;
             buf.terminal_state_mut().set_text_window(x0.into(), y0.into(), x1.into(), y1.into());
-            buf.caret_mut().set_font_page(size.clamp(0, 4) as u8);
-            buf.set_caret_position((x0 as i32, y0 as i32).into());
+            buf.caret_mut().set_font_page(font_page);
+            if !unchanged {
+                buf.set_caret_position((x0 as i32, y0 as i32).into());
+            }
         }
 
         RipCommand::ViewPort { x0, y0, x1, y1 } => {
@@ -44,7 +66,10 @@ fn execute_rip_command(buf: &mut dyn EditableScreen, bgi: &mut Bgi, cmd: RipComm
         }
 
         RipCommand::EraseWindow => {
-            buf.terminal_state_mut().reset_text_window();
+            if let Some((left, top, right, bottom)) = active_text_window(buf) {
+                clear_text_cells(buf, bgi, left, top, right, bottom);
+                buf.set_caret_position(Position::new(left, top));
+            }
         }
 
         RipCommand::EraseView => {
@@ -52,15 +77,24 @@ fn execute_rip_command(buf: &mut dyn EditableScreen, bgi: &mut Bgi, cmd: RipComm
         }
 
         RipCommand::GotoXY { x, y } => {
-            bgi.move_to(x.into(), y.into());
+            if let Some((left, top, right, bottom)) = active_text_window(buf) {
+                buf.set_caret_position(Position::new((left + i32::from(x)).min(right), (top + i32::from(y)).min(bottom)));
+            }
         }
 
         RipCommand::Home => {
-            buf.home();
+            if let Some((left, top, _, _)) = active_text_window(buf) {
+                buf.set_caret_position(Position::new(left, top));
+            }
         }
 
         RipCommand::EraseEOL => {
-            buf.clear_line_end();
+            if let Some((left, top, right, bottom)) = active_text_window(buf) {
+                let position = buf.caret_position();
+                if position.x >= left && position.x <= right && position.y >= top && position.y <= bottom {
+                    clear_text_cells(buf, bgi, position.x, position.y, right, position.y);
+                }
+            }
         }
 
         RipCommand::Color { c } => {
@@ -294,7 +328,9 @@ fn execute_rip_command(buf: &mut dyn EditableScreen, bgi: &mut Bgi, cmd: RipComm
         }
 
         RipCommand::GetImage { x0, y0, x1, y1, res: _ } => {
-            bgi.rip_image = Some(bgi.image(buf, x0.into(), y0.into(), x1.into(), y1.into()));
+            if x0 <= x1 && y0 <= y1 {
+                bgi.rip_image = Some(bgi.image(buf, x0.into(), y0.into(), i32::from(x1) + 1, i32::from(y1) + 1));
+            }
         }
 
         RipCommand::PutImage { x, y, mode, res: _ } => {
@@ -507,7 +543,7 @@ fn execute_rip_command(buf: &mut dyn EditableScreen, bgi: &mut Bgi, cmd: RipComm
             bgi.put_image(buf, x0.into(), dest_line.into(), &image, bgi.write_mode());
         }
 
-        RipCommand::ReadScene { file_name: _ } => {
+        RipCommand::ReadScene { res: _, file_name: _ } => {
             // ReadScene not implemented in current BGI
         }
 

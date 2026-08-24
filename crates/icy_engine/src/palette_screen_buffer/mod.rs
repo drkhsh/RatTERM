@@ -452,6 +452,10 @@ impl Screen for PaletteScreenBuffer {
 }
 
 impl EditableScreen for PaletteScreenBuffer {
+    fn text_output_enabled(&self) -> bool {
+        !self.bgi.suspend_text
+    }
+
     fn snapshot_scrollback(&mut self) -> Option<Arc<Mutex<Box<dyn Screen>>>> {
         let mut scrollback = self.scrollback_buffer.clone();
         scrollback.snapshot_current_screen(self);

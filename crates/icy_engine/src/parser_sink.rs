@@ -538,6 +538,9 @@ impl<'a> ScreenSink<'a> {
 
 impl CommandSink for ScreenSink<'_> {
     fn print(&mut self, text: &[u8]) {
+        if !self.screen.text_output_enabled() {
+            return;
+        }
         match self.screen.buffer_type() {
             BufferType::Unicode => {
                 // UTF-8 mode: use utf8parse for proper multi-byte sequence handling

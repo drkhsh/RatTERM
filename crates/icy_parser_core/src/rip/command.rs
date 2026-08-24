@@ -305,7 +305,7 @@ pub enum RipCommand {
         dest_line: u16,
     },
     /// RIP_READ_SCENE (`|1R`) – loads scene file (filename only, no path).
-    ReadScene { file_name: String },
+    ReadScene { res: u64, file_name: String },
     /// RIP_FILE_QUERY (`|1F`) – queries file (existence / metadata) by name.
     /// `mode` determines response format, `res` (4 digits) reserved for future use.
     FileQuery { mode: FileQueryMode, res: u16, file_name: String },
@@ -738,7 +738,7 @@ impl fmt::Display for RipCommand {
                     to_base_36(2, *dest_line)
                 )
             }
-            RipCommand::ReadScene { file_name } => write!(f, "|1R{}", escape_text(file_name)),
+            RipCommand::ReadScene { res, file_name } => write!(f, "|1R{}{}", to_base_36_u64(8, *res), escape_text(file_name)),
             RipCommand::FileQuery { mode, res, file_name } => {
                 write!(f, "|1F{}{}{}", to_base_36(2, *mode as u16), to_base_36(4, *res), escape_text(file_name))
             }
@@ -771,8 +771,11 @@ impl fmt::Display for RipCommand {
 
 /// Convert a number to base-36 representation with a fixed length
 pub fn to_base_36(len: usize, number: u16) -> String {
+    to_base_36_u64(len, number.into())
+}
+
+fn to_base_36_u64(len: usize, mut number: u64) -> String {
     let mut res = String::new();
-    let mut number = number;
     for _ in 0..len {
         let num2 = (number % 36) as u8;
         let ch2 = if num2 < 10 { (num2 + b'0') as char } else { (num2 - 10 + b'A') as char };

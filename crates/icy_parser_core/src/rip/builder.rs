@@ -12,6 +12,7 @@ pub struct CommandBuilder {
 
     // Reusable buffers for command parameters
     pub u16_params: Vec<u16>,
+    pub u64_param: u64,
     pub string_param: Vec<u8>,
     pub char_param: u8,
     pub got_escape: bool,
@@ -30,6 +31,7 @@ impl CommandBuilder {
         self.param_state = 0;
         self.npoints = 0;
         self.u16_params.clear();
+        self.u64_param = 0;
         self.string_param.clear();
         self.char_param = 0;
         self.got_escape = false;

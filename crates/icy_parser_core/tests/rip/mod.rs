@@ -356,7 +356,7 @@ fn test_rip_button() {
     let mut parser = RipParser::new();
     let mut sink = TestSink::new();
 
-    parser.parse(b"!|1U05051015000100Enter<>cmd<>label<>text\n", &mut sink);
+    parser.parse(b"!|1U050510150001icon<>label<>host command\n", &mut sink);
 
     assert_eq!(sink.rip_commands.len(), 1);
     match &sink.rip_commands[0] {
@@ -377,10 +377,22 @@ fn test_rip_button() {
             assert_eq!(*hotkey, 0);
             assert_eq!(*flags, 0);
             assert_eq!(*res, 1);
-            assert_eq!(text, "00Enter<>cmd<>label<>text");
+            assert_eq!(text, "icon<>label<>host command");
         }
         _ => panic!("Expected Button command"),
     }
+}
+
+#[test]
+fn test_rip_button_style_ignores_trailing_text() {
+    let mut parser = RipParser::new();
+    let mut sink = TestSink::new();
+
+    parser.parse(b"!|1B0A0A010274030F080F080700010E07000000ignored\n", &mut sink);
+
+    assert_eq!(sink.rip_commands.len(), 1);
+    assert!(matches!(sink.rip_commands[0], RipCommand::ButtonStyle { res: 0, .. }));
+    assert!(sink.terminal_commands.is_empty());
 }
 
 #[test]
@@ -489,9 +501,19 @@ fn test_rip_passthrough_text() {
 
     parser.parse(b"Regular text before !|c0F RIP command\n", &mut sink);
 
-    // Should have text before and after RIP command
     assert!(!sink.terminal_commands.is_empty());
-    assert_eq!(sink.rip_commands.len(), 1);
+    assert!(sink.rip_commands.is_empty(), "RIP commands must only be recognized at the start of a line");
+}
+
+#[test]
+fn test_rip_ignores_trailing_text_on_command_line() {
+    let mut parser = RipParser::new();
+    let mut sink = TestSink::new();
+
+    parser.parse(b"!|c0Fignored text\n", &mut sink);
+
+    assert_eq!(sink.rip_commands, [RipCommand::Color { c: 15 }]);
+    assert!(sink.terminal_commands.is_empty(), "trailing RIP command-line text must not reach the TTY");
 }
 
 #[test]

@@ -25,6 +25,7 @@ enum State {
     ReadLevel1,
     ReadLevel9,
     ReadParams,
+    RipLine,
     GotEscape,          // Got ESC character
     GotEscBracket,      // Got ESC[
     ReadAnsiNumber(u8), // Reading number after ESC[
@@ -45,6 +46,8 @@ pub struct RipParser {
     enabled: bool, // RIPscrip processing enabled/disabled
     got_backslash: bool,
     win_eol: bool,
+    at_line_start: bool,
+    escape_at_line_start: bool,
 }
 
 impl RipParser {
@@ -57,6 +60,8 @@ impl RipParser {
             enabled: true, // RIPscrip starts enabled
             got_backslash: false,
             win_eol: false,
+            at_line_start: true,
+            escape_at_line_start: false,
         }
     }
 }
@@ -70,6 +75,9 @@ impl Default for RipParser {
 impl CommandParser for RipParser {
     fn parse(&mut self, input: &[u8], sink: &mut dyn CommandSink) {
         for &ch in input {
+            let at_line_start = self.at_line_start;
+            self.at_line_start = ch == b'\r' || ch == b'\n';
+
             // Check for backslash (line continuation) in any RIP state
             if self.mode == ParserMode::Rip {
                 if ch == b'\r' {
@@ -115,8 +123,9 @@ impl CommandParser for RipParser {
                         ParserMode::NonRip => {
                             if ch == 0x1B {
                                 // ESC character - check if it's an ANSI RIP control sequence
+                                self.escape_at_line_start = at_line_start;
                                 self.state = State::GotEscape;
-                            } else if ch == b'!' && self.enabled {
+                            } else if ch == b'!' && self.enabled && at_line_start {
                                 self.mode = ParserMode::Rip;
                                 self.state = State::GotExclaim;
                             } else {
@@ -127,8 +136,9 @@ impl CommandParser for RipParser {
                         ParserMode::Rip => {
                             if ch == 0x1B {
                                 // ESC character - check if it's an ANSI RIP control sequence
+                                self.escape_at_line_start = at_line_start;
                                 self.state = State::GotEscape;
-                            } else if ch == b'!' {
+                            } else if ch == b'!' && at_line_start {
                                 self.state = State::GotExclaim;
                             } else {
                                 // In RIP mode without !, treat as error and go back to NonRip
@@ -152,6 +162,7 @@ impl CommandParser for RipParser {
                     if ch == b'!' {
                         // ESC[! - Query version (same as ESC[0!)
                         sink.request(crate::TerminalRequest::RipRequestTerminalId);
+                        self.at_line_start = self.escape_at_line_start;
                         self.state = State::Default;
                     } else if ch.is_ascii_digit() {
                         // Start reading number
@@ -169,20 +180,20 @@ impl CommandParser for RipParser {
                             b'0' => {
                                 // ESC[0! - Query version
                                 sink.request(crate::TerminalRequest::RipRequestTerminalId);
+                                self.at_line_start = self.escape_at_line_start;
                                 self.state = State::Default;
-                                return;
                             }
                             b'1' => {
                                 // ESC[1! - Disable RIPscrip (handled internally)
                                 self.enabled = false;
+                                self.at_line_start = self.escape_at_line_start;
                                 self.state = State::Default;
-                                return;
                             }
                             b'2' => {
                                 // ESC[2! - Enable RIPscrip (handled internally)
                                 self.enabled = true;
+                                self.at_line_start = self.escape_at_line_start;
                                 self.state = State::Default;
-                                return;
                             }
                             _ => {
                                 log::warn!("Unknown RIP ANSI request: ESC[{}!", digit as char);
@@ -225,9 +236,7 @@ impl CommandParser for RipParser {
                         self.builder.level = 0;
                         self.emit_command(sink);
                         self.builder.reset();
-                        // Unfortunately, real-world files have multiple |# commands, so stay in RIP mode
-                        // and go back to GotExclaim state to allow |#|#|# sequences
-                        self.state = State::GotExclaim;
+                        self.state = State::RipLine;
                     } else {
                         // Level 0 command
                         self.builder.level = 0;
@@ -248,6 +257,12 @@ impl CommandParser for RipParser {
                         // Parse error - already reset by parse_params
                     }
                 }
+                State::RipLine => match ch {
+                    b'|' => self.state = State::GotPipe,
+                    b'!' => self.state = State::GotExclaim,
+                    b'\r' | b'\n' => self.state = State::Default,
+                    _ => {}
+                },
             }
         }
     }
