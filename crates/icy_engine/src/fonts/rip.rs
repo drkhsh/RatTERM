@@ -3,6 +3,17 @@ use crate::{BitFont, BitFontType};
 
 lazy_static::lazy_static! {
     pub static ref FONT: BitFont = BitFont::from_sauce_name("IBM VGA50").unwrap();
+    pub static ref RIPTERM_FONT: BitFont = {
+        // See data/fonts/Rip/README.md for the independent JDraw/DOSBox extraction.
+        let mut font = FONT.clone();
+        font.set_name("RIPterm 8x8");
+        let data = include_bytes!("../../data/fonts/Rip/RIPterm_8x8.raw");
+        for code in 32..256 {
+            let offset = (code - 32) * 8;
+            font.glyph_mut(code as u8 as char).data[..8].copy_from_slice(&data[offset..offset + 8]);
+        }
+        font
+    };
     pub static ref EGA_7x8: BitFont = BitFont::from_bytes("EGA 7x8", include_bytes!("../../data/fonts/Rip/Bm437_EverexME_7x8.psf")).unwrap();
     pub static ref VGA_8x14: BitFont = BitFont::from_bytes("VGA 8x14", include_bytes!("../../data/fonts/Rip/IBM_VGA_8x14.psf")).unwrap();
 

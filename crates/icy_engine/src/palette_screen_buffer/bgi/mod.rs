@@ -154,7 +154,7 @@ impl FontType {
 }
 
 lazy_static::lazy_static! {
-    pub static ref DEFAULT_BITFONT : BitFont = BitFont::from_sauce_name("IBM VGA50").unwrap();
+    pub static ref DEFAULT_BITFONT : BitFont = crate::rip::RIPTERM_FONT.clone();
 
     static ref FONTS: Vec<Font> = vec![
         Font::load(include_bytes!("fonts/SANS.CHR")).unwrap(),
@@ -2033,15 +2033,21 @@ impl Bgi {
                     // Underline hotkey character
                     if self.button_style.underline_hotkey() {
                         let hotkey_size = self.text_size(&character.to_string());
+                        let underline_y = if matches!(self.font, FontType::Default) {
+                            ty + hotkey_size.height + 1
+                        } else {
+                            let size = self.char_size as usize;
+                            ty + self.font.font().height() * SCALE_UP[size] / SCALE_DOWN[size] + 2
+                        };
 
                         // Draw drop shadow for underline
                         if self.button_style.display_dropshadow() {
                             self.draw_line(
                                 buf,
                                 tx + prefix_size.width + 1,
-                                ty + hotkey_size.height + 2,
-                                tx + prefix_size.width + hotkey_size.width,
-                                ty + hotkey_size.height + 2,
+                                underline_y + 1,
+                                tx + prefix_size.width + hotkey_size.width - 1,
+                                underline_y + 1,
                                 cs,
                             );
                         }
@@ -2050,9 +2056,9 @@ impl Bgi {
                         self.draw_line(
                             buf,
                             tx + prefix_size.width,
-                            ty + hotkey_size.height + 1,
-                            tx + prefix_size.width + hotkey_size.width - 1,
-                            ty + hotkey_size.height + 1,
+                            underline_y,
+                            tx + prefix_size.width + hotkey_size.width - 2,
+                            underline_y,
                             ul,
                         );
                     }
@@ -2089,16 +2095,28 @@ impl Bgi {
         } else {
             None
         };
+        let clipboard_size = if self.button_style.is_clipboard_button() {
+            let Some(image) = &self.rip_image else {
+                return;
+            };
+            Some((image.width, image.height))
+        } else {
+            None
+        };
 
         let mut width = x2 - x1 + 1;
         let mut height = y2 - y1 + 1;
 
         if x2 == 0 {
-            width = icon.as_ref().map_or(self.button_style.size.width, |icon| icon.0);
+            width = icon
+                .as_ref()
+                .map_or_else(|| clipboard_size.map_or(self.button_style.size.width, |size| size.0), |icon| icon.0);
             x2 = x1 + width - 1;
         }
         if y2 == 0 {
-            height = icon.as_ref().map_or(self.button_style.size.height, |icon| icon.1);
+            height = icon
+                .as_ref()
+                .map_or_else(|| clipboard_size.map_or(self.button_style.size.height, |size| size.1), |icon| icon.1);
             y2 = y1 + height - 1;
         }
 
@@ -2162,6 +2180,8 @@ impl Bgi {
                     self.put_pixel(buf, x1 + x, y1 + y, pixels[(y * icon_width + x) as usize]);
                 }
             }
+        } else if self.button_style.is_clipboard_button() {
+            self.put_rip_image(buf, x1, y1, WriteMode::Copy);
         }
 
         // Draw sunken effect (button border)
@@ -2245,16 +2265,28 @@ impl Bgi {
                         x1
                     } else if self.button_style.right_justify_label() {
                         x1 + width - text_size.width
+                    } else if self.button_style.is_icon_button() {
+                        x1 + (width - text_size.width).div_euclid(2)
                     } else {
                         x1 + (width - text_size.width) / 2
                     };
-                    (tx, y1 + height + 2)
+                    let gap = if self.button_style.is_clipboard_button() || self.button_style.is_icon_button() {
+                        4
+                    } else {
+                        2
+                    };
+                    (tx, y1 + height + gap)
                 }
                 LabelOrientation::Center => (x1 + (width - text_size.width) / 2, y1 + (height - text_size.height) / 2),
             };
 
             // Render the label text with all effects
-            self.render_button_label(buf, &text, tx, ty, hotkey, ch, cs, ul);
+            let shadow = if self.button_style.is_clipboard_button() || self.button_style.is_icon_button() {
+                self.button_style.drop_shadow_color as u8
+            } else {
+                cs
+            };
+            self.render_button_label(buf, &text, tx, ty, hotkey, ch, shadow, ul);
             self.set_color(old_col);
         }
     }
