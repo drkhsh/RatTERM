@@ -19,12 +19,14 @@ fn escape_text(text: &str) -> String {
 
 /// RIPscrip command enumeration.
 ///
-/// Each variant corresponds to a command defined in the original RIPscrip 1.54
-/// specification (see `RIPSCRIP.TXT`). Parameters are already decoded from
-/// their on‑wire Base‑36 representation into signed `i32` values; string / text
-/// parameters are unescaped (the parser converts `\!`, `\|`, `\\` back to
-/// literal characters). Display (`fmt::Display`) re‑encodes to canonical
-/// Base‑36 form and re‑escapes text where required.
+/// Most variants correspond to commands defined in the original RIPscrip 1.54
+/// specification (see `RIPSCRIP.TXT`). RIPscrip 2.x scene controls are exposed
+/// directly, while other 2.x/3.x commands are retained as [`RipCommand::Unsupported`]
+/// so later command levels do not desynchronize the stream. Parameters are
+/// decoded from their on-wire Base-36 representation; string / text parameters
+/// are unescaped (the parser converts `\!`, `\|`, `\\` back to literal
+/// characters). Display (`fmt::Display`) re-encodes to canonical Base-36 form
+/// and re-escapes text where required.
 ///
 /// Conventions:
 /// - Level 0 commands use a single `|<char>` prefix (after the mandatory `!`).
@@ -47,6 +49,15 @@ fn escape_text(text: &str) -> String {
 #[derive(Debug, Clone, PartialEq)]
 pub enum RipCommand {
     // Level 0 commands
+    /// RIP_HEADER (`|h`) identifies the following RIPscrip revision and scene
+    /// reset behavior. Introduced in RIPscrip 2.0.
+    Header { revision: u16, flags: u32, res: u16 },
+    /// RIP_COMMENT (`|!`) embeds ignored authoring text in a RIP stream.
+    Comment { text: String },
+    /// RIP_GROUP_BEGIN (`|(`) groups commands for authoring tools.
+    GroupBegin,
+    /// RIP_GROUP_END (`|)`) closes an authoring-tool command group.
+    GroupEnd,
     /// RIP_TEXT_WINDOW (`|w`)
     /// Defines the TTY text window (character cell coordinates). `(x0,y0)` is
     /// upper‑left, `(x1,y1)` lower‑right inclusive. `wrap` controls horizontal
@@ -327,12 +338,22 @@ pub enum RipCommand {
     TextVariable { text: String },
     /// RIP_NO_MORE (`|#`) – terminator: signals end of RIP command stream & return to plain text/ANSI.
     NoMore,
+    /// A syntactically valid command not implemented by this parser version.
+    /// Retaining it keeps later RIPscrip levels parseable without interpreting
+    /// unknown parameter layouts.
+    Unsupported { level: Vec<u8>, command: u8, data: String },
 }
 
 impl fmt::Display for RipCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             // Level 0 commands
+            RipCommand::Header { revision, flags, res } => {
+                write!(f, "|h{}{}{}", to_base_36(2, *revision), to_base_36_u64(4, (*flags).into()), to_base_36(2, *res))
+            }
+            RipCommand::Comment { text } => write!(f, "|!{}", escape_text(text)),
+            RipCommand::GroupBegin => write!(f, "|("),
+            RipCommand::GroupEnd => write!(f, "|)"),
             RipCommand::TextWindow { x0, y0, x1, y1, wrap, size } => {
                 write!(
                     f,
@@ -765,6 +786,13 @@ impl fmt::Display for RipCommand {
             // Special commands
             RipCommand::TextVariable { text } => write!(f, "|${}", escape_text(text)),
             RipCommand::NoMore => write!(f, "|#"),
+            RipCommand::Unsupported { level, command, data } => {
+                write!(f, "|")?;
+                for digit in level {
+                    write!(f, "{digit}")?;
+                }
+                write!(f, "{}{}", char::from(*command), escape_text(data))
+            }
         }
     }
 }

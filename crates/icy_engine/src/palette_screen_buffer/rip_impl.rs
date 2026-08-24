@@ -37,6 +37,8 @@ fn clear_text_cells(buf: &mut dyn EditableScreen, bgi: &Bgi, left: i32, top: i32
 fn execute_rip_command(buf: &mut dyn EditableScreen, bgi: &mut Bgi, cmd: RipCommand) {
     match cmd {
         // Level 0 commands
+        RipCommand::Header { .. } | RipCommand::Comment { .. } | RipCommand::GroupBegin | RipCommand::GroupEnd => {}
+
         RipCommand::TextWindow { x0, y0, x1, y1, wrap, size } => {
             if x0 == 0 && y0 == 0 && x1 == 0 && y1 == 0 && size == 0 && !wrap {
                 bgi.suspend_text = true;
@@ -567,6 +569,8 @@ fn execute_rip_command(buf: &mut dyn EditableScreen, bgi: &mut Bgi, cmd: RipComm
         RipCommand::NoMore => {
             // End of RIP commands
         }
+
+        RipCommand::Unsupported { .. } => {}
     }
 }
 

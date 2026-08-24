@@ -22,8 +22,7 @@ enum State {
     Default,
     GotExclaim,
     GotPipe,
-    ReadLevel1,
-    ReadLevel9,
+    ReadLevel,
     ReadParams,
     RipLine,
     GotEscape,          // Got ESC character
@@ -224,12 +223,10 @@ impl CommandParser for RipParser {
                 }
                 State::GotPipe => {
                     // Read command character
-                    if ch == b'1' {
-                        self.builder.level = 1;
-                        self.state = State::ReadLevel1;
-                    } else if ch == b'9' {
-                        self.builder.level = 9;
-                        self.state = State::ReadLevel9;
+                    if (b'1'..=b'9').contains(&ch) {
+                        self.builder.level = ch - b'0';
+                        self.builder.level_path.push(self.builder.level);
+                        self.state = State::ReadLevel;
                     } else if ch == b'#' {
                         // No more RIP
                         self.builder.cmd_char = b'#';
@@ -244,13 +241,14 @@ impl CommandParser for RipParser {
                         self.state = State::ReadParams;
                     }
                 }
-                State::ReadLevel1 => {
-                    self.builder.cmd_char = ch;
-                    self.state = State::ReadParams;
-                }
-                State::ReadLevel9 => {
-                    self.builder.cmd_char = ch;
-                    self.state = State::ReadParams;
+                State::ReadLevel => {
+                    if (b'1'..=b'9').contains(&ch) && self.builder.level_path.len() < 9 {
+                        self.builder.level_path.push(ch - b'0');
+                        self.builder.level = u8::MAX;
+                    } else {
+                        self.builder.cmd_char = ch;
+                        self.state = State::ReadParams;
+                    }
                 }
                 State::ReadParams => {
                     if !self.parse_params(ch, sink) {

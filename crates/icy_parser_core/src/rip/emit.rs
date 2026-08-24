@@ -5,6 +5,16 @@ impl RipParser {
     pub fn emit_command(&mut self, sink: &mut dyn CommandSink) {
         let cmd = match (self.builder.level, self.builder.cmd_char) {
             // Level 0 commands
+            (0, b'h') if self.builder.u16_params.len() >= 2 => RipCommand::Header {
+                revision: self.builder.u16_params[0],
+                flags: self.builder.u64_param as u32,
+                res: self.builder.u16_params[1],
+            },
+            (0, b'!') => RipCommand::Comment {
+                text: self.builder.take_string(),
+            },
+            (0, b'(') => RipCommand::GroupBegin,
+            (0, b')') => RipCommand::GroupEnd,
             (0, b'w') if self.builder.u16_params.len() >= 5 => RipCommand::TextWindow {
                 x0: self.builder.u16_params[0],
                 y0: self.builder.u16_params[1],
@@ -429,18 +439,11 @@ impl RipParser {
                 }
             }
 
-            _ => {
-                // Unknown command - report error
-                sink.report_error(
-                    crate::ParseError::InvalidParameter {
-                        command: "RIP",
-                        value: (self.builder.cmd_char as u16).to_string(),
-                        expected: Some("valid RIP command character".to_string()),
-                    },
-                    crate::ErrorLevel::Error,
-                );
-                return;
-            }
+            _ => RipCommand::Unsupported {
+                level: self.builder.level_path.clone(),
+                command: self.builder.cmd_char,
+                data: self.builder.take_string(),
+            },
         };
 
         sink.emit_rip(cmd);

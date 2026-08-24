@@ -25,7 +25,7 @@ impl RipParser {
         // Parse parameters based on command
         let result = match (self.builder.level, self.builder.cmd_char) {
             // Commands with no parameters
-            (0, b'*') | (0, b'e') | (0, b'E') | (0, b'H') | (0, b'>') | (0, b'#') | (1, b'K') | (1, b'E') => {
+            (0, b'(') | (0, b')') | (0, b'*') | (0, b'e') | (0, b'E') | (0, b'H') | (0, b'>') | (0, b'#') | (1, b'K') | (1, b'E') => {
                 // Immediate commands - complete immediately
                 self.emit_command(sink);
                 self.builder.reset();
@@ -34,9 +34,34 @@ impl RipParser {
             }
 
             // Text commands (consume rest as string)
-            (0, b'T') | (0, b'$') => {
+            (0, b'!') | (0, b'T') | (0, b'$') => {
                 self.builder.string_param.push(ch);
                 Ok(false)
+            }
+
+            // Header: revision(2), flags(4), reserved(2).
+            (0, b'h') => {
+                if let Some(digit) = BASE36_LUT[ch as usize] {
+                    match self.builder.param_state {
+                        0..=1 => {
+                            if self.builder.u16_params.is_empty() {
+                                self.builder.u16_params.resize(2, 0);
+                            }
+                            self.builder.u16_params[0] = self.builder.u16_params[0].wrapping_mul(36).wrapping_add(digit);
+                        }
+                        2..=5 => {
+                            self.builder.u64_param = self.builder.u64_param * 36 + u64::from(digit);
+                        }
+                        6..=7 => {
+                            self.builder.u16_params[1] = self.builder.u16_params[1].wrapping_mul(36).wrapping_add(digit);
+                        }
+                        _ => {}
+                    }
+                    self.builder.param_state += 1;
+                    Ok(self.builder.param_state >= 8)
+                } else {
+                    Err(())
+                }
             }
 
             // ReadScene: res(8) then filename string
@@ -546,7 +571,13 @@ impl RipParser {
                 Ok(false)
             }
 
-            _ => Err(()),
+            // Unknown commands are opaque until the next command delimiter or
+            // line ending. This preserves stream synchronization for later
+            // RIPscrip levels whose parameter layouts are not implemented yet.
+            _ => {
+                self.builder.string_param.push(ch);
+                Ok(false)
+            }
         };
 
         match result {

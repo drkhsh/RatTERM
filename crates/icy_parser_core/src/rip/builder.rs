@@ -7,6 +7,7 @@
 pub struct CommandBuilder {
     pub cmd_char: u8,
     pub level: u8,
+    pub level_path: Vec<u8>,
     pub param_state: usize,
     pub npoints: u16,
 
@@ -28,6 +29,7 @@ impl CommandBuilder {
     pub fn reset(&mut self) {
         self.cmd_char = 0;
         self.level = 0;
+        self.level_path.clear();
         self.param_state = 0;
         self.npoints = 0;
         self.u16_params.clear();
