@@ -170,7 +170,7 @@ impl PaletteScreenBuffer {
         let pixel_height = self.pixel_size.height;
 
         // Copy glyph data to avoid borrow conflict
-        let (glyph_data, pixel_x, pixel_y, font_size) = {
+        let (glyph_data, pixel_x, pixel_y, font_size, horizontal_scale) = {
             let font = if let Some(font) = self.font(ch.font_page() as usize) {
                 font
             } else if let Some(font) = self.font(0) {
@@ -179,11 +179,17 @@ impl PaletteScreenBuffer {
                 &DEFAULT_BITFONT
             };
 
-            let font_size = font.size();
+            let horizontal_scale = if matches!(self.graphics_type, GraphicsType::Rip) && ch.font_page() == 4 {
+                2
+            } else {
+                1
+            };
+            let source_size = font.size();
+            let font_size = Size::new(source_size.width * horizontal_scale, source_size.height);
             let pixel_x = x * font_size.width;
             let pixel_y = y * font_size.height;
             let glyph = font.glyph(ch.ch);
-            (glyph.data, pixel_x, pixel_y, font_size)
+            (glyph.data, pixel_x, pixel_y, font_size, horizontal_scale)
         };
 
         // Render the character
@@ -197,7 +203,8 @@ impl PaletteScreenBuffer {
                 }
 
                 // Check if pixel is set in font glyph using packed byte data
-                let is_foreground = (glyph_data[row as usize] & (0x80 >> col)) != 0;
+                let source_col = col / horizontal_scale;
+                let is_foreground = (glyph_data[row as usize] & (0x80 >> source_col)) != 0;
 
                 // Clone colors to avoid move in loop
                 let color = if is_foreground { fg_color } else { bg_color };

@@ -229,6 +229,22 @@ fn bgi_angle_size(angle: i32, radius_x: i32, radius_y: i32) -> Position {
     Position::new(bgi_trig_mul(bgi_sin(angle + 90), radius_x), -bgi_trig_mul(bgi_sin(angle), radius_y))
 }
 
+fn bgi_arc_metric(x: i32, mut y: i32) -> i32 {
+    y = -y;
+    if x >= 0 {
+        if y >= 0 { y - x } else { x + 6000 + y }
+    } else if y >= 0 {
+        -x + 2000 - y
+    } else {
+        x + 4000 - y
+    }
+}
+
+fn bgi_arc_limit(radius_x: i32, radius_y: i32, angle: i32) -> i32 {
+    let point = bgi_angle_size(angle, radius_x, radius_y);
+    bgi_arc_metric(point.x, point.y)
+}
+
 pub struct Image {
     pub width: i32,
     pub height: i32,
@@ -1582,53 +1598,46 @@ impl Bgi {
         let d2xt = 2 * b2;
         let d2yt = 2 * a2;
 
-        let inv = end_angle < start_angle;
+        let start_limit = bgi_arc_limit(radius_x, radius_y, start_angle);
+        let end_limit = bgi_arc_limit(radius_x, radius_y, end_angle);
+        let inv = end_limit <= start_limit;
+        let zero_span = start_angle == end_angle && !(start_angle == 0 && end_angle == 360);
         let mut skip = false;
 
-        // Helper closure to check if angle is in range
-        let in_range = |angle: i32| -> bool {
-            if inv {
-                angle <= end_angle || angle >= start_angle
+        let in_range = |metric: i32, angle: i32| -> bool {
+            if zero_span {
+                angle == start_angle
+            } else if inv {
+                metric >= start_limit || metric <= end_limit
             } else {
-                angle >= start_angle && angle <= end_angle
+                metric >= start_limit && metric <= end_limit
             }
         };
 
         while ey >= 0 && ex <= radius_x {
-            // Calculate angle for current position
             let angle = if ey == 0 {
                 90
             } else {
-                let angle_rad = (ex as f64 / ey as f64).atan();
-                let angle_deg = angle_rad * RAD2DEG;
-                (90.0 - angle_deg).round() as i32
+                (90.0 - (ex as f64 / ey as f64).atan() * RAD2DEG).round() as i32
             };
-
             if !skip {
                 if ex != 0 || ey != 0 {
-                    // Top-left quadrant (180 - angle)
-                    let qangle = 180 - angle;
-                    if in_range(qangle) {
+                    if in_range(ex - ey + 2000, 180 - angle) {
                         self.put_pixel(buf, x - ex, y - ey, self.color);
                     }
                 }
 
-                if ex != 0 && ey != 0 {
-                    // Top-right quadrant (angle)
-                    if in_range(angle) {
+                if ex != 0 || ey != 0 {
+                    if in_range(ey - ex, angle) {
                         self.put_pixel(buf, x + ex, y - ey, self.color);
                     }
 
-                    // Bottom-left quadrant (180 + angle)
-                    let qangle = 180 + angle;
-                    if in_range(qangle) {
+                    if in_range(ey - ex + 4000, 180 + angle) {
                         self.put_pixel(buf, x - ex, y + ey, self.color);
                     }
                 }
 
-                // Bottom-right quadrant (360 - angle)
-                let qangle = 360 - angle;
-                if in_range(qangle) {
+                if in_range(ex - ey + 6000, 360 - angle) {
                     self.put_pixel(buf, x + ex, y + ey, self.color);
                 }
             }
@@ -1711,15 +1720,19 @@ impl Bgi {
         let d2xt = 2 * b2;
         let d2yt = 2 * a2;
 
-        let inv = end_angle < start_angle;
+        let start_limit = bgi_arc_limit(radius_x, radius_y, start_angle);
+        let end_limit = bgi_arc_limit(radius_x, radius_y, end_angle);
+        let inv = end_limit <= start_limit;
+        let zero_span = start_angle == end_angle && !(start_angle == 0 && end_angle == 360);
         let mut skip = false;
 
-        // Helper closure to check if angle is in range
-        let in_range = |angle: i32| -> bool {
-            if inv {
-                angle <= end_angle || angle >= start_angle
+        let in_range = |metric: i32, angle: i32| -> bool {
+            if zero_span {
+                angle == start_angle
+            } else if inv {
+                metric >= start_limit || metric <= end_limit
             } else {
-                angle >= start_angle && angle <= end_angle
+                metric >= start_limit && metric <= end_limit
             }
         };
 
@@ -1735,29 +1748,22 @@ impl Bgi {
 
             if !skip {
                 if ex != 0 || ey != 0 {
-                    // Top-left quadrant
-                    let qangle = 180 - angle;
-                    if in_range(qangle) {
+                    if in_range(ex - ey + 2000, 180 - angle) {
                         add_scan_row(rows, x - ex, y - ey);
                     }
                 }
 
-                if ex != 0 && ey != 0 {
-                    // Top-right quadrant
-                    if in_range(angle) {
+                if ex != 0 || ey != 0 {
+                    if in_range(ey - ex, angle) {
                         add_scan_row(rows, x + ex, y - ey);
                     }
 
-                    // Bottom-left quadrant
-                    let qangle = 180 + angle;
-                    if in_range(qangle) {
+                    if in_range(ey - ex + 4000, 180 + angle) {
                         add_scan_row(rows, x - ex, y + ey);
                     }
                 }
 
-                // Bottom-right quadrant
-                let qangle = 360 - angle;
-                if in_range(qangle) {
+                if in_range(ex - ey + 6000, 360 - angle) {
                     add_scan_row(rows, x + ex, y + ey);
                 }
             }
@@ -1897,8 +1903,8 @@ impl Bgi {
     pub fn sector(&mut self, buf: &mut dyn EditableScreen, x: i32, y: i32, start_angle: i32, end_angle: i32, radiusx: i32, radius_y: i32) {
         let center = Position::new(x, y);
         let mut rows = create_scan_rows();
-        let start_point = center + get_angle_size(start_angle, radiusx, radius_y);
-        let end_point = center + get_angle_size(end_angle, radiusx, radius_y);
+        let start_point = center + bgi_angle_size(start_angle, radiusx, radius_y);
+        let end_point = center + bgi_angle_size(end_angle, radiusx, radius_y);
 
         let oldthickness = self.line_thickness();
         if !matches!(self.line_style, LineStyle::Solid) {
@@ -1907,8 +1913,10 @@ impl Bgi {
 
         self.scan_ellipse(x, y, start_angle, end_angle, radiusx, radius_y, &mut rows);
 
-        scan_line(center, start_point, &mut rows, true);
-        scan_line(center, end_point, &mut rows, true);
+        let fill_start_point = closest_scan_point(&rows, center, start_point, bgi_arc_limit(radiusx, radius_y, start_angle));
+        let fill_end_point = closest_scan_point(&rows, center, end_point, bgi_arc_limit(radiusx, radius_y, end_angle));
+        scan_polygon_edge(center, fill_start_point, &mut rows);
+        scan_polygon_edge(center, fill_end_point, &mut rows);
 
         if !matches!(self.fill_style, FillStyle::Empty) {
             self.fill_scan(buf, &mut rows);
@@ -1924,8 +1932,13 @@ impl Bgi {
             self.set_line_thickness(oldthickness);
         }
 
-        self.line(buf, center.x, center.y, start_point.x, start_point.y);
-        self.line(buf, center.x, center.y, end_point.x, end_point.y);
+        if matches!(self.line_style, LineStyle::Solid) {
+            self.draw_bgi_solid_line(buf, center.x, center.y, start_point.x, start_point.y, oldthickness);
+            self.draw_bgi_solid_line(buf, center.x, center.y, end_point.x, end_point.y, oldthickness);
+        } else {
+            self.line(buf, center.x, center.y, start_point.x, start_point.y);
+            self.line(buf, center.x, center.y, end_point.x, end_point.y);
+        }
     }
 
     pub fn pie_slice(&mut self, buf: &mut dyn EditableScreen, x: i32, y: i32, start_angle: i32, end_angle: i32, radius: i32) {
@@ -2560,6 +2573,33 @@ fn scan_line(start: Position, end: Position, rows: &mut Vec<Vec<i32>>, full: boo
     }
     if full || end.y < start.y {
         add_scan_row(rows, end.x, end.y);
+    }
+}
+
+fn closest_scan_point(rows: &[Vec<i32>], center: Position, target: Position, target_metric: i32) -> Position {
+    rows.iter()
+        .enumerate()
+        .flat_map(|(row, points)| points.iter().map(move |x| Position::new(*x, row as i32 - 1)))
+        .min_by_key(|point| {
+            let offset = *point - center;
+            let metric_delta = (bgi_arc_metric(offset.x, offset.y) - target_metric).abs();
+            let x_delta = point.x - target.x;
+            let y_delta = point.y - target.y;
+            (metric_delta, x_delta * x_delta + y_delta * y_delta)
+        })
+        .unwrap_or(target)
+}
+
+fn scan_polygon_edge(mut start: Position, mut end: Position, rows: &mut Vec<Vec<i32>>) {
+    if end.y < start.y {
+        std::mem::swap(&mut start, &mut end);
+    }
+    if start.y == end.y {
+        return;
+    }
+    for y in start.y..end.y {
+        let x = start.x + (y - start.y) * (end.x - start.x) / (end.y - start.y);
+        add_scan_row(rows, x, y);
     }
 }
 
