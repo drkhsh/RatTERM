@@ -1,1 +1,1 @@
-tools/ripterm_font_extract.rip whitespace=-trailing-space
+*.rip whitespace=cr-at-eol
