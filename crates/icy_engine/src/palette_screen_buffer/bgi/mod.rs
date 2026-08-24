@@ -195,6 +195,41 @@ const DEFAULT_USER_PATTERN: [u8; 8] = [0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA,
 const RAD2DEG: f64 = 180.0 / consts::PI;
 const DEG2RAD: f64 = consts::PI / 180.0;
 const ASPECT: f64 = 350.0 / 480.0 * 1.06; //0.772; //7.0/9.0; //350.0 / 480.0 * 1.066666;
+const BGI_SIN_TABLE: [u16; 91] = [
+    0x0000, 0x023B, 0x0477, 0x06B2, 0x08ED, 0x0B27, 0x0D61, 0x0F99, 0x11D0, 0x1406, 0x163A, 0x186C, 0x1A9C, 0x1CCB, 0x1EF7,
+    0x2120, 0x2348, 0x256C, 0x278D, 0x29AC, 0x2BC7, 0x2DDF, 0x2FF3, 0x3203, 0x340F, 0x3618, 0x381C, 0x3A1C, 0x3C17, 0x3E0E,
+    0x4000, 0x41EC, 0x43D4, 0x45B6, 0x4793, 0x496A, 0x4B3C, 0x4D08, 0x4ECD, 0x508D, 0x5246, 0x53F9, 0x55A6, 0x574B, 0x58EA,
+    0x5A82, 0x5C13, 0x5D9C, 0x5F1F, 0x609A, 0x620D, 0x6379, 0x64DD, 0x6639, 0x678D, 0x68D9, 0x6A1D, 0x6B59, 0x6C8C, 0x6DB7,
+    0x6ED9, 0x6FF3, 0x7104, 0x720C, 0x730B, 0x7401, 0x74EF, 0x75D3, 0x76AD, 0x777F, 0x7847, 0x7906, 0x79BC, 0x7A68, 0x7B0A,
+    0x7BA3, 0x7C32, 0x7CB8, 0x7D33, 0x7DA5, 0x7E0E, 0x7E6C, 0x7EC1, 0x7F0B, 0x7F4C, 0x7F83, 0x7FB0, 0x7FD3, 0x7FEC, 0x7FFB,
+    0x8000,
+];
+
+fn bgi_sin(angle: i32) -> i32 {
+    let mut angle = angle.rem_euclid(360);
+    let negative = angle > 180;
+    if negative {
+        angle -= 180;
+    }
+    if angle > 90 {
+        angle = 180 - angle;
+    }
+    let value = i32::from(BGI_SIN_TABLE[angle as usize]) << 1;
+    if negative { -value } else { value }
+}
+
+fn bgi_trig_mul(trig: i32, radius: i32) -> i32 {
+    let low = (trig as u32 & 0xFFFF) as u16;
+    let high = ((trig >> 16) as u32 & 0xFFFF) as u16;
+    let radius = radius as u16;
+    let high_product = u32::from(high) * u32::from(radius);
+    let low_product = u32::from(low) * u32::from(radius);
+    ((high_product & 0xFFFF) + (low_product >> 16)) as u16 as i16 as i32
+}
+
+fn bgi_angle_size(angle: i32, radius_x: i32, radius_y: i32) -> Position {
+    Position::new(bgi_trig_mul(bgi_sin(angle + 90), radius_x), -bgi_trig_mul(bgi_sin(angle), radius_y))
+}
 
 pub struct Image {
     pub width: i32,
@@ -909,6 +944,63 @@ impl Bgi {
             if e2 < dx {
                 err += dx;
                 y += sy;
+            }
+        }
+    }
+
+    fn draw_bgi_solid_line(&mut self, buf: &mut dyn EditableScreen, mut x1: i32, mut y1: i32, mut x2: i32, mut y2: i32, width: i32) {
+        let (original_x1, original_y1, original_x2, original_y2) = (x1, y1, x2, y2);
+        if y2 < y1 {
+            std::mem::swap(&mut x1, &mut x2);
+            std::mem::swap(&mut y1, &mut y2);
+        }
+
+        let delta_x = (x2 - x1).abs();
+        let delta_y = (y2 - y1).abs();
+        let x_offset = if x2 < x1 { -1 } else { 1 };
+        let y_offset = if y2 < y1 { -1 } else { 1 };
+
+        if delta_x >= delta_y {
+            let mut error = 2 * delta_y - delta_x;
+            let mut x = x1;
+            let mut y = y1;
+            loop {
+                self.put_pixel(buf, x, y, self.color);
+                if x == x2 {
+                    break;
+                }
+                if error >= 0 {
+                    y += y_offset;
+                    error -= 2 * delta_x;
+                }
+                error += 2 * delta_y;
+                x += x_offset;
+            }
+        } else {
+            let mut error = 2 * delta_x - delta_y;
+            let mut x = x1;
+            let mut y = y1;
+            loop {
+                self.put_pixel(buf, x, y, self.color);
+                if y == y2 {
+                    break;
+                }
+                if error >= 0 {
+                    x += x_offset;
+                    error -= 2 * delta_y;
+                }
+                error += 2 * delta_x;
+                y += y_offset;
+            }
+        }
+
+        if width == 3 {
+            for side in [-1, 1] {
+                if (original_x2 - original_x1).abs() >= (original_y2 - original_y1).abs() {
+                    self.draw_bgi_solid_line(buf, original_x1, original_y1 + side, original_x2, original_y2 + side, 1);
+                } else {
+                    self.draw_bgi_solid_line(buf, original_x1 + side, original_y1, original_x2 + side, original_y2, 1);
+                }
             }
         }
     }
@@ -1702,11 +1794,102 @@ impl Bgi {
         }
     }
 
+    fn scan_bgi_full_ellipse(&self, x: i32, y: i32, radius_x: i32, radius_y: i32, rows: &mut Vec<Vec<i32>>) {
+        let radius_x = radius_x.max(1);
+        let radius_y = radius_y.max(1);
+        let bigger = i64::from(radius_x.max(radius_y));
+        let scaled_square = bigger * bigger * 100;
+        let step = scaled_square / i64::from(radius_x) / i64::from(radius_x);
+        let step_constant = scaled_square / i64::from(radius_y) / i64::from(radius_y);
+        let temp = step_constant * i64::from(radius_y);
+
+        let mut ellipse_x = 0;
+        let mut ellipse_y = radius_y;
+        let mut error = temp * i64::from(radius_y) - scaled_square;
+        let mut delta = 2 * temp;
+        let mut increment_accumulator = 0;
+
+        let plot = |ellipse_x: i32, ellipse_y: i32, rows: &mut Vec<Vec<i32>>| {
+            add_scan_row(rows, x + ellipse_x, y - ellipse_y);
+            add_scan_row(rows, x - ellipse_x, y - ellipse_y);
+            add_scan_row(rows, x - ellipse_x, y + ellipse_y);
+            add_scan_row(rows, x + ellipse_x, y + ellipse_y);
+        };
+
+        plot(ellipse_x, ellipse_y, rows);
+        let mut increment = increment_accumulator + step;
+        let mut threshold = delta - step_constant;
+        if 2 * error + 2 * increment >= threshold {
+            ellipse_y -= 1;
+            error -= threshold;
+            delta = threshold - step_constant;
+        }
+        ellipse_x += 1;
+        error += increment;
+        increment_accumulator = increment + step;
+
+        while increment_accumulator < delta {
+            plot(ellipse_x, ellipse_y, rows);
+            increment = increment_accumulator + step;
+            threshold = delta - step_constant;
+            if 2 * error + 2 * increment >= threshold {
+                ellipse_y -= 1;
+                error -= threshold;
+                delta = threshold - step_constant;
+            }
+            ellipse_x += 1;
+            error += increment;
+            increment_accumulator = increment + step;
+        }
+
+        while ellipse_y >= 0 {
+            plot(ellipse_x, ellipse_y, rows);
+            increment = increment_accumulator + step;
+            threshold = delta - step_constant;
+            if increment / 2 + error <= threshold {
+                ellipse_x += 1;
+                error += increment;
+                increment_accumulator = increment + step;
+            }
+            ellipse_y -= 1;
+            error -= threshold;
+            delta = threshold - step_constant;
+        }
+    }
+
     pub fn fill_ellipse(&mut self, buf: &mut dyn EditableScreen, x: i32, y: i32, start_angle: i32, end_angle: i32, radius_x: i32, radius_y: i32) {
         let mut rows = create_scan_rows();
-        self.scan_ellipse(x, y, start_angle, end_angle, radius_x, radius_y, &mut rows);
+        let use_bgi_sweep = start_angle == 0
+            && end_angle == 360
+            && self.line_thickness == 3
+            && self.fill_color != 0
+            && matches!(self.line_style, LineStyle::Solid);
+        if use_bgi_sweep {
+            self.scan_bgi_full_ellipse(x, y, radius_x, radius_y, &mut rows);
+        } else {
+            self.scan_ellipse(x, y, start_angle, end_angle, radius_x, radius_y, &mut rows);
+        }
         self.fill_scan(buf, &mut rows);
-        self.draw_scan(buf, &mut rows);
+        if use_bgi_sweep {
+            let center = Position::new(x, y);
+            let mut previous = center + bgi_angle_size(start_angle, radius_x, radius_y);
+            let mut drew_segment = false;
+            let mut drew_duplicate_cap = false;
+            for angle in start_angle + 1..=end_angle {
+                let current = center + bgi_angle_size(angle, radius_x, radius_y);
+                if current != previous {
+                    self.draw_bgi_solid_line(buf, previous.x, previous.y, current.x, current.y, 3);
+                    previous = current;
+                    drew_segment = true;
+                    drew_duplicate_cap = false;
+                } else if drew_segment && !drew_duplicate_cap {
+                    self.draw_bgi_solid_line(buf, current.x, current.y, current.x, current.y, 3);
+                    drew_duplicate_cap = true;
+                }
+            }
+        } else {
+            self.draw_scan(buf, &mut rows);
+        }
     }
 
     pub fn clear_device(&mut self, buf: &mut dyn EditableScreen) {
@@ -2282,7 +2465,12 @@ impl Bgi {
                         (top, base - top + 1)
                     };
                     let mut metric_y = y1 + (height - metric_height) / 2 + 1;
-                    if self.button_style.is_icon_button() || self.button_style.is_plain_button() && !self.button_style.is_mouse_button() {
+                    if self.button_style.is_icon_button()
+                        || self.button_style.is_plain_button() && !self.button_style.is_mouse_button()
+                        || self.button_style.is_plain_button()
+                            && matches!(self.font, FontType::Default)
+                            && height <= 10
+                    {
                         metric_y -= 1;
                     }
                     (x1 + (width - text_size.width) / 2, metric_y - font_top)
