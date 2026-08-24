@@ -2128,31 +2128,6 @@ impl Bgi {
         let surface_x2 = x2;
         let surface_y2 = y2;
 
-        // Draw recessed frame if needed
-        if self.button_style.display_recessed() && !pressed {
-            let recessed_x1 = x1 - 2;
-            let recessed_y1 = y1 - 2;
-            let recessed_x2 = x2 + 2;
-            let recessed_y2 = y2 + 2;
-
-            // Outer recessed frame
-            self.draw_line(buf, recessed_x1, recessed_y1, recessed_x2, recessed_y1, cs);
-            self.draw_line(buf, recessed_x1, recessed_y1, recessed_x1, recessed_y2, cs);
-            self.draw_line(buf, recessed_x2, recessed_y1, recessed_x2, recessed_y2, br);
-            self.draw_line(buf, recessed_x1, recessed_y2, recessed_x2, recessed_y2, br);
-
-            self.put_pixel(buf, recessed_x1, recessed_y1, cc);
-            self.put_pixel(buf, recessed_x2, recessed_y1, cc);
-            self.put_pixel(buf, recessed_x1, recessed_y2, cc);
-            self.put_pixel(buf, recessed_x2, recessed_y2, cc);
-
-            // Inner black frame
-            self.draw_line(buf, recessed_x1 + 1, recessed_y1 + 1, recessed_x2 - 1, recessed_y1 + 1, bg);
-            self.draw_line(buf, recessed_x1 + 1, recessed_y1 + 1, recessed_x1 + 1, recessed_y2 - 1, bg);
-            self.draw_line(buf, recessed_x2 - 1, recessed_y1 + 1, recessed_x2 - 1, recessed_y2 - 1, bg);
-            self.draw_line(buf, recessed_x1 + 1, recessed_y2 - 1, recessed_x2 - 1, recessed_y2 - 1, bg);
-        }
-
         // Draw bevel effect if needed
         if self.button_style.display_bevel_special_effect() {
             for i in 1..=self.button_style.bevel_size {
@@ -2208,28 +2183,48 @@ impl Bgi {
         // Draw chisel effect
         if self.button_style.display_chisel() {
             let (xinset, yinset) = chisel_inset(y2 - y1 + 1);
+            let left = x1 + xinset;
+            let top = y1 + yinset;
+            let right = x2 - xinset;
+            let bottom = y2 - yinset;
 
-            if pressed || self.button_style.display_sunken_effect() {
-                let left = x1 + xinset;
-                let top = y1 + yinset;
-                let right = x2 - xinset;
-                let bottom = y2 - yinset;
+            self.draw_line(buf, left, top, right, top, cs);
+            self.draw_line(buf, left, top, left, bottom, cs);
+            self.draw_line(buf, left + 1, bottom - 1, right - 1, bottom - 1, cs);
+            self.draw_line(buf, right - 1, top + 2, right - 1, bottom - 1, cs);
 
-                self.draw_line(buf, left, top, right, top, cs);
-                self.draw_line(buf, left, top, left, bottom, cs);
-                self.draw_line(buf, left + 1, bottom - 1, right - 1, bottom - 1, cs);
-                self.draw_line(buf, right - 1, top + 2, right - 1, bottom - 1, cs);
+            self.draw_line(buf, left + 1, top + 1, right, top + 1, br);
+            self.draw_line(buf, left + 1, top + 1, left + 1, bottom, br);
+            self.draw_line(buf, left + 1, bottom, right, bottom, br);
+            self.draw_line(buf, right, top + 1, right, bottom, br);
+        }
 
-                self.draw_line(buf, left + 1, top + 1, right, top + 1, br);
-                self.draw_line(buf, left + 1, top + 1, left + 1, bottom, br);
-                self.draw_line(buf, left + 1, bottom, right, bottom, br);
-                self.draw_line(buf, right, top + 1, right, bottom, br);
+        // The recessed frame surrounds the complete button image, including its bevel.
+        if self.button_style.display_recessed() {
+            let bevel_extent = if self.button_style.display_bevel_special_effect() {
+                self.button_style.bevel_size
             } else {
-                self.draw_line(buf, x1 + xinset, y1 + yinset, x2 - xinset, y1 + yinset, br);
-                self.draw_line(buf, x1 + xinset, y1 + yinset, x1 + xinset, y2 - yinset, br);
-                self.draw_line(buf, x1 + xinset + 1, y2 - yinset, x2 - xinset, y2 - yinset, cs);
-                self.draw_line(buf, x2 - xinset, y1 + yinset + 1, x2 - xinset, y2 - yinset, cs);
-            }
+                0
+            };
+            let recessed_x1 = x1 - bevel_extent - 2;
+            let recessed_y1 = y1 - bevel_extent - 2;
+            let recessed_x2 = x2 + bevel_extent + 2;
+            let recessed_y2 = y2 + bevel_extent + 2;
+
+            self.draw_line(buf, recessed_x1, recessed_y1, recessed_x2, recessed_y1, cs);
+            self.draw_line(buf, recessed_x1, recessed_y1, recessed_x1, recessed_y2, cs);
+            self.draw_line(buf, recessed_x2, recessed_y1, recessed_x2, recessed_y2, br);
+            self.draw_line(buf, recessed_x1, recessed_y2, recessed_x2, recessed_y2, br);
+
+            self.put_pixel(buf, recessed_x1, recessed_y1, cc);
+            self.put_pixel(buf, recessed_x2, recessed_y1, cc);
+            self.put_pixel(buf, recessed_x1, recessed_y2, cc);
+            self.put_pixel(buf, recessed_x2, recessed_y2, cc);
+
+            self.draw_line(buf, recessed_x1 + 1, recessed_y1 + 1, recessed_x2 - 1, recessed_y1 + 1, bg);
+            self.draw_line(buf, recessed_x1 + 1, recessed_y1 + 1, recessed_x1 + 1, recessed_y2 - 1, bg);
+            self.draw_line(buf, recessed_x2 - 1, recessed_y1 + 1, recessed_x2 - 1, recessed_y2 - 1, bg);
+            self.draw_line(buf, recessed_x1 + 1, recessed_y2 - 1, recessed_x2 - 1, recessed_y2 - 1, bg);
         }
 
         // Draw text label
@@ -2265,8 +2260,6 @@ impl Bgi {
                         x1
                     } else if self.button_style.right_justify_label() {
                         x1 + width - text_size.width
-                    } else if self.button_style.is_icon_button() {
-                        x1 + (width - text_size.width).div_euclid(2)
                     } else {
                         x1 + (width - text_size.width) / 2
                     };
@@ -2277,15 +2270,27 @@ impl Bgi {
                     };
                     (tx, y1 + height + gap)
                 }
-                LabelOrientation::Center => (x1 + (width - text_size.width) / 2, y1 + (height - text_size.height) / 2),
+                LabelOrientation::Center => {
+                    let (font_top, metric_height) = if matches!(self.font, FontType::Default) {
+                        (0, 7 * self.char_size)
+                    } else {
+                        let font = self.font.font();
+                        let size = self.char_size as usize;
+                        let draw_height = font.height() * SCALE_UP[size] / SCALE_DOWN[size];
+                        let top = draw_height - font.capital_height * SCALE_UP[size] / SCALE_DOWN[size];
+                        let base = draw_height - font.base_height * SCALE_UP[size] / SCALE_DOWN[size];
+                        (top, base - top + 1)
+                    };
+                    let mut metric_y = y1 + (height - metric_height) / 2 + 1;
+                    if self.button_style.is_icon_button() || self.button_style.is_plain_button() && !self.button_style.is_mouse_button() {
+                        metric_y -= 1;
+                    }
+                    (x1 + (width - text_size.width) / 2, metric_y - font_top)
+                }
             };
 
             // Render the label text with all effects
-            let shadow = if self.button_style.is_clipboard_button() || self.button_style.is_icon_button() {
-                self.button_style.drop_shadow_color as u8
-            } else {
-                cs
-            };
+            let shadow = self.button_style.drop_shadow_color as u8;
             self.render_button_label(buf, &text, tx, ty, hotkey, ch, shadow, ul);
             self.set_color(old_col);
         }
