@@ -850,6 +850,14 @@ impl Bgi {
         let ly_delta = (y2 - y1).abs();
         let lx_delta2 = (x2 - x1).abs();
         let mut offset = 0;
+        if lx_delta2 == 0 && ly_delta == 0 && self.line_thickness == 3 && matches!(self.line_style, LineStyle::Solid) {
+            if self.line_pattern[0] {
+                self.put_pixel(buf, x1, y1 - 1, self.color);
+                self.put_pixel(buf, x1, y1, self.color);
+                self.put_pixel(buf, x1, y1 + 1, self.color);
+            }
+            return;
+        }
         if lx_delta2 == 0 {
             self.fill_y(buf, x1, y1.min(y2), ly_delta + 1, &mut offset);
         } else if ly_delta == 0 {
@@ -1074,163 +1082,240 @@ impl Bgi {
     }
 
     pub fn flood_fill(&mut self, buf: &mut dyn EditableScreen, start_x: i32, start_y: i32, edge: u8) {
-        // Early bounds / trivial exit
+        if !matches!(self.fill_style, FillStyle::User) || edge != 0 {
+            self.flood_fill_legacy(buf, start_x, start_y, edge);
+            return;
+        }
         if !self.viewport.contains(start_x, start_y) {
             return;
         }
-
-        // If starting pixel is already edge, nothing to do.
         if self.pixel(buf, start_x, start_y) == edge {
             return;
         }
 
-        // Retrieve pattern (clone user pattern first to avoid borrow issues during pixel writes)
         let user_pattern = self.fill_user_pattern.clone();
         let pattern = self.fill_style.fill_pattern(&user_pattern);
-
         let vp_left = self.viewport.left();
         let vp_top = self.viewport.top();
         let vp_right = self.viewport.right();
         let vp_bottom = self.viewport.bottom();
 
-        let width = self.viewport.width();
-        let height = self.viewport.height();
-
-        // Visited bitmap so we don’t revisit horizontal spans
-        let mut visited = vec![false; (width * height) as usize];
-
-        // SavedPoint replicates original C struct (x,y,oy)
         #[derive(Clone, Copy)]
         struct SavedPoint {
             x: i32,
             y: i32,
-            oy: i32,
+            direction: i32,
         }
 
-        // Stack of SavedPoint (LIFO)
-        let mut stack: Vec<SavedPoint> = Vec::new();
-        stack.push(SavedPoint {
+        let mut stack = vec![SavedPoint {
             x: start_x,
             y: start_y,
-            oy: start_y,
-        });
+            direction: 0,
+        }];
+        let mut found_directional = false;
+        let mut previous_y = start_y;
+        let mut previous_left = start_x;
+        let mut previous_right = start_x;
 
-        // Helper to map absolute coords into visited index
-        let idx = |x: i32, y: i32| -> Option<usize> {
+        while let Some(seed) = stack.pop() {
+            if !self.viewport.contains(seed.x, seed.y) || self.pixel(buf, seed.x, seed.y) == edge {
+                continue;
+            }
+
+            let pattern_row = pattern[(seed.y & 7) as usize];
+            let mut right = seed.x;
+            while right < vp_right && self.pixel(buf, right, seed.y) != edge {
+                let mask = 0x80 >> (right & 7);
+                let color = if pattern_row & mask != 0 { self.fill_color } else { self.bkcolor };
+                self.put_pixel(buf, right, seed.y, color);
+                right += 1;
+            }
+            let right_edge = right - 1;
+
+            let mut left = seed.x - 1;
+            while left >= vp_left && self.pixel(buf, left, seed.y) != edge {
+                let mask = 0x80 >> (left & 7);
+                let color = if pattern_row & mask != 0 { self.fill_color } else { self.bkcolor };
+                self.put_pixel(buf, left, seed.y, color);
+                left -= 1;
+            }
+            let left_edge = left + 1;
+
+            let mut push_up = true;
+            let mut push_down = true;
+            if seed.direction > 0 {
+                push_up = false;
+            } else if seed.direction < 0 {
+                push_down = false;
+            } else if !found_directional && left_edge >= previous_left && right_edge <= previous_right {
+                if previous_y + 1 == seed.y {
+                    push_up = false;
+                } else if previous_y - 1 == seed.y {
+                    push_down = false;
+                }
+            }
+
+            for (adjacent_y, direction, enabled) in [(seed.y - 1, -1, push_up), (seed.y + 1, 1, push_down)] {
+                if !enabled || adjacent_y < vp_top || adjacent_y >= vp_bottom {
+                    continue;
+                }
+                let adjacent_pattern = pattern[(adjacent_y & 7) as usize];
+                let mut in_span = false;
+                let scan_left = if left_edge == vp_left { left_edge + 1 } else { left_edge };
+                let scan_right = if right_edge == vp_right - 1 { right_edge - 1 } else { right_edge };
+                let mut scan_x = scan_left;
+                loop {
+                    let pixel = self.pixel(buf, scan_x, adjacent_y);
+                    if pixel == edge {
+                        in_span = false;
+                    } else if !in_span {
+                        let mask = 0x80 >> (scan_x & 7);
+                        let expected = if adjacent_pattern & mask != 0 { self.fill_color } else { self.bkcolor };
+                        if adjacent_pattern == 0 || self.fill_color == self.bkcolor {
+                            if stack.len() < 492 {
+                                stack.push(SavedPoint {
+                                    x: scan_x,
+                                    y: adjacent_y,
+                                    direction,
+                                });
+                                found_directional = true;
+                            }
+                            in_span = true;
+                        } else if pixel != expected {
+                            if stack.len() < 492 {
+                                stack.push(SavedPoint {
+                                    x: scan_x,
+                                    y: adjacent_y,
+                                    direction: 0,
+                                });
+                            }
+                            in_span = true;
+                        }
+                    }
+                    if scan_x >= scan_right {
+                        break;
+                    }
+                    scan_x += 1;
+                }
+            }
+
+            previous_y = seed.y;
+            previous_left = left_edge;
+            previous_right = right_edge;
+        }
+    }
+
+    fn flood_fill_legacy(&mut self, buf: &mut dyn EditableScreen, start_x: i32, start_y: i32, edge: u8) {
+        if !self.viewport.contains(start_x, start_y) || self.pixel(buf, start_x, start_y) == edge {
+            return;
+        }
+
+        let user_pattern = self.fill_user_pattern.clone();
+        let pattern = self.fill_style.fill_pattern(&user_pattern);
+        let vp_left = self.viewport.left();
+        let vp_top = self.viewport.top();
+        let vp_right = self.viewport.right();
+        let vp_bottom = self.viewport.bottom();
+        let width = self.viewport.width();
+        let height = self.viewport.height();
+        let mut visited = vec![false; (width * height) as usize];
+
+        #[derive(Clone, Copy)]
+        struct SavedPoint {
+            x: i32,
+            y: i32,
+            origin_y: i32,
+        }
+
+        let mut stack = vec![SavedPoint {
+            x: start_x,
+            y: start_y,
+            origin_y: start_y,
+        }];
+        let index = |x: i32, y: i32| -> Option<usize> {
             if x < vp_left || x >= vp_right || y < vp_top || y >= vp_bottom {
                 return None;
             }
             Some(((y - vp_top) * width + (x - vp_left)) as usize)
         };
 
-        while let Some(SavedPoint { x, y, oy }) = stack.pop() {
-            // Bounds & skip checks
-            if !self.viewport.contains(x, y) {
+        while let Some(SavedPoint { x, y, origin_y }) = stack.pop() {
+            if !self.viewport.contains(x, y) || self.pixel(buf, x, y) == edge {
+                continue;
+            }
+            if index(x, y).is_some_and(|i| visited[i]) {
                 continue;
             }
 
-            // Skip if pixel is edge or already visited
-            if self.pixel(buf, x, y) == edge {
-                continue;
-            }
-            if let Some(i) = idx(x, y) {
-                if visited[i] {
-                    continue;
-                }
-            }
-
-            // Move left until edge (or viewport boundary)
             let mut scan_x = x;
             while scan_x > vp_left {
-                let nx = scan_x - 1;
-                let px = self.pixel(buf, nx, y);
-                if px == edge {
+                let next_x = scan_x - 1;
+                if self.pixel(buf, next_x, y) == edge || index(next_x, y).is_some_and(|i| visited[i]) {
                     break;
-                }
-                if let Some(i) = idx(nx, y) {
-                    if visited[i] {
-                        break;
-                    }
                 }
                 scan_x -= 1;
             }
 
-            // Initialize pattern bit positions
-            let mut vx = (vp_left + scan_x) & 0x07;
-            let vy = (vp_top + y) & 0x07;
-
-            // Pre-calc offsets for previous & next line visitation
-            let prev_y = y - 1;
+            let mut pattern_x = (vp_left + scan_x) & 7;
+            let pattern_y = (vp_top + y) & 7;
+            let previous_y = y - 1;
             let next_y = y + 1;
+            let pattern_row = pattern[pattern_y as usize];
+            let is_zero = pattern_row == 0;
+            let mut previous_active = false;
+            let mut next_active = false;
+            let mut current_x = scan_x;
 
-            // iszero condition (copy of C logic: skip vertical adjacency if current pattern row is all zero)
-            let pattern_row = pattern[vy as usize];
-            let iszero = pattern_row == 0;
-
-            let mut prevline_active = false;
-            let mut nextline_active = false;
-
-            let mut cur_x = scan_x;
-            while cur_x < vp_right {
-                // Stop if edge encountered
-                let col = self.pixel(buf, cur_x, y);
-                if col == edge {
+            while current_x < vp_right {
+                if self.pixel(buf, current_x, y) == edge || index(current_x, y).is_none_or(|i| visited[i]) {
                     break;
                 }
 
-                // Stop if already filled
-                let already = idx(cur_x, y).is_none_or(|i| visited[i]);
-                if already {
-                    break;
-                }
-
-                // Determine fill foreground/background based on pattern bit
-                let cur_pattern_row = pattern[vy as usize];
-                let bit_mask = 0x80u8 >> vx;
-                let use_fg = (cur_pattern_row & bit_mask) != 0;
-                let write_color = if use_fg { self.fill_color } else { self.bkcolor };
-                self.put_pixel(buf, cur_x, y, write_color);
-
-                // Mark visited
-                if let Some(i) = idx(cur_x, y) {
+                let mask = 0x80 >> pattern_x;
+                let foreground = pattern_row & mask != 0;
+                self.put_pixel(buf, current_x, y, if foreground { self.fill_color } else { self.bkcolor });
+                if let Some(i) = index(current_x, y) {
                     visited[i] = true;
                 }
 
-                // Only consider spawning vertical segments when:
-                //  - pattern row is zero OR pattern bit set (matches C: (row==0) || (row & mask))
-                if cur_pattern_row == 0 || use_fg {
-                    // Previous line logic
-                    if prev_y >= vp_top && !iszero && !(iszero && oy == prev_y) {
-                        let prev_pixel = self.pixel(buf, cur_x, prev_y);
-                        let prev_visited = idx(cur_x, prev_y).is_none_or(|i| visited[i]);
-                        if prevline_active {
-                            if prev_pixel == edge {
-                                prevline_active = false;
+                if pattern_row == 0 || foreground {
+                    if previous_y >= vp_top && !is_zero && !(is_zero && origin_y == previous_y) {
+                        let pixel = self.pixel(buf, current_x, previous_y);
+                        let was_visited = index(current_x, previous_y).is_none_or(|i| visited[i]);
+                        if previous_active {
+                            if pixel == edge {
+                                previous_active = false;
                             }
-                        } else if cur_x > vp_left && cur_x < vp_right - 1 && prev_pixel != edge && !prev_visited {
-                            prevline_active = true;
-                            stack.push(SavedPoint { x: cur_x, y: prev_y, oy: y });
+                        } else if current_x > vp_left && current_x < vp_right - 1 && pixel != edge && !was_visited {
+                            previous_active = true;
+                            stack.push(SavedPoint {
+                                x: current_x,
+                                y: previous_y,
+                                origin_y: y,
+                            });
                         }
                     }
 
-                    // Next line logic
-                    if next_y < vp_bottom && !iszero && !(iszero && oy == next_y) {
-                        let next_pixel = self.pixel(buf, cur_x, next_y);
-                        let next_visited = idx(cur_x, next_y).is_none_or(|i| visited[i]);
-                        if nextline_active {
-                            if next_pixel == edge {
-                                nextline_active = false;
+                    if next_y < vp_bottom && !is_zero && !(is_zero && origin_y == next_y) {
+                        let pixel = self.pixel(buf, current_x, next_y);
+                        let was_visited = index(current_x, next_y).is_none_or(|i| visited[i]);
+                        if next_active {
+                            if pixel == edge {
+                                next_active = false;
                             }
-                        } else if cur_x > vp_left && cur_x < vp_right - 1 && next_pixel != edge && !next_visited {
-                            nextline_active = true;
-                            stack.push(SavedPoint { x: cur_x, y: next_y, oy: y });
+                        } else if current_x > vp_left && current_x < vp_right - 1 && pixel != edge && !was_visited {
+                            next_active = true;
+                            stack.push(SavedPoint {
+                                x: current_x,
+                                y: next_y,
+                                origin_y: y,
+                            });
                         }
                     }
                 }
 
-                // Advance pattern x position
-                vx = (vx + 1) & 0x07;
-                cur_x += 1;
+                pattern_x = (pattern_x + 1) & 7;
+                current_x += 1;
             }
         }
     }
