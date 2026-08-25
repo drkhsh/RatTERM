@@ -933,6 +933,10 @@ impl CommandSink for ScreenSink<'_> {
                 self.screen.terminal_state_mut().clear_margins_top_bottom();
                 self.screen.set_caret_position(Position::default());
             }
+            TerminalCommand::ResetTopBottomMargins => {
+                self.screen.terminal_state_mut().clear_margins_top_bottom();
+                self.screen.set_caret_position(Position::default());
+            }
             TerminalCommand::ResetLeftAndRightMargin { left, right } => {
                 let width = self.screen.width();
 

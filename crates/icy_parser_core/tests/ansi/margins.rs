@@ -8,10 +8,19 @@ fn test_reset_margins() {
     let mut parser = AnsiParser::new();
     let mut sink = CollectSink::new();
 
-    // ESC[r - Reset margins (no parameters)
+    // ESC[r - Reset top/bottom margins (no parameters)
     parser.parse(b"\x1B[r", &mut sink);
     assert_eq!(sink.cmds.len(), 1);
-    assert_eq!(sink.cmds[0], TerminalCommand::ResetMargins);
+    assert_eq!(sink.cmds[0], TerminalCommand::ResetTopBottomMargins);
+}
+
+#[test]
+fn test_invalid_top_bottom_margin_is_ignored() {
+    let mut parser = AnsiParser::new();
+    let mut sink = CollectSink::new();
+
+    parser.parse(b"\x1B[20;5r", &mut sink);
+    assert!(sink.cmds.is_empty());
 }
 
 #[test]

@@ -226,6 +226,18 @@ fn test_absolute_cursor_rows_inside_rectangular_margins() {
 }
 
 #[test]
+fn test_decstbm_reset_preserves_left_right_margins() {
+    let mut screen = TextScreen::new(Size::new(80, 25));
+    let mut parser = AnsiParser::new();
+
+    parser.parse(b"\x1b[5;18r\x1b[?69h\x1b[18;63s\x1b[10;10H\x1b[r", &mut ScreenSink::new(&mut screen));
+
+    assert_eq!(screen.terminal_state().margins_top_bottom(), None);
+    assert_eq!(screen.terminal_state().margins_left_right(), Some((17, 62)));
+    assert_eq!(screen.caret_position(), Position::default());
+}
+
+#[test]
 fn test_last_column_flag_delays_wrap_until_next_character() {
     let mut screen = TextScreen::new(Size::new(3, 2));
     screen.terminal_state_mut().last_column_flag_mode = true;

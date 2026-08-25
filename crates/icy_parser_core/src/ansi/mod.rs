@@ -1843,15 +1843,13 @@ impl AnsiParser {
                 sgr::parse_sgr(params, sink);
             }
             b'r' => match self.params.len() {
-                0 => sink.emit(TerminalCommand::ResetMargins),
+                0 => sink.emit(TerminalCommand::ResetTopBottomMargins),
                 1 => sink.emit(TerminalCommand::SetTopBottomMargin {
                     top: 0,
                     bottom: self.params[0],
                 }),
                 2 => {
-                    if self.params[0] > self.params[1] {
-                        sink.emit(TerminalCommand::ResetMargins)
-                    } else {
+                    if self.params[0] < self.params[1] {
                         sink.emit(TerminalCommand::SetTopBottomMargin {
                             top: self.params[0],
                             bottom: self.params[1],
@@ -1873,9 +1871,9 @@ impl AnsiParser {
                 _ => {
                     sink.report_error(
                         ParseError::MalformedSequence {
-                            description: "Invalid parameter count for CSI = r",
-                            sequence: Some(format!("CSI = {:?} r", self.params)),
-                            context: Some(format!("Expected 2-4 parameters for scroll region, got {}", self.params.len())),
+                            description: "Invalid parameter count for CSI r",
+                            sequence: Some(format!("CSI {:?} r", self.params)),
+                            context: Some(format!("Expected 0-4 parameters for scroll region, got {}", self.params.len())),
                         },
                         crate::ErrorLevel::Error,
                     );

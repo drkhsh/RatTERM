@@ -1026,6 +1026,7 @@ pub enum TerminalCommand {
     /// ANSI Music sequence
     /// Conflicting CSI M/N commands can trigger music playback
     ResetMargins,
+    ResetTopBottomMargins,
     ResetLeftAndRightMargin {
         left: u16,
         right: u16,
