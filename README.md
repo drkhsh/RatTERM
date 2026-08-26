@@ -1,67 +1,86 @@
-# icy_tools
+# RatTERM
 
-This repository contains tools releated to BBSing and Ansi in general. It contains:
+RatTERM is a fork of [IcyTERM](https://github.com/mkrueger/icy_tools) by Mike
+Krüger that adds a **Reticulum (rnsh) connection type**, so you can dial BBSes
+published on the [Reticulum](https://reticulum.network/) mesh the same way you
+dial a Telnet or SSH board.
 
-[Icy Term](https://github.com/mkrueger/icy_tools/blob/master/crates/icy_term/README.md)
-a terminal program for legacy BBS systems.
+Everything else is upstream IcyTERM, unchanged, including the other tools in
+this workspace ([Icy Draw](crates/icy_draw/README.md),
+[Icy View](crates/icy_view/README.md), [Icy Play](crates/icy_play/README.md)).
+This fork exists only because the Reticulum transport cannot go upstream; see
+[Why a fork?](#why-a-fork).
 
-[Icy Draw](https://github.com/mkrueger/icy_tools/blob/master/crates/icy_draw/README.md)
-a drawing tool supporting almost all ANSI formats.
+## Using it
 
-[Icy View](https://github.com/mkrueger/icy_tools/blob/master/crates/icy_view/README.md)
-a viewer to browse/view Ansi screens.
+1. In the dialing directory, set the connection type to **Reticulum (rnsh)**.
+2. Put the 32-character hex **destination hash** in the address field. An
+   `rns://` prefix is accepted and ignored.
+3. Connect.
 
-[Icy Play](https://github.com/mkrueger/icy_tools/blob/master/crates/icy_play/README.md)
-a tool that shows icy draw animations on cmd line/bbs.
+RatTERM uses your **existing Reticulum configuration**, the default config
+directory shared with `rnsd` and other RNS apps, so whatever interfaces you
+already have are what it routes over. At least one working interface with a path
+to the destination is required.
 
-# Build instructions
+On first use a client identity is generated and stored next to IcyTERM's config
+as `reticulum_identity`. To reach a listener that restricts access, add that
+identity's hash to its allowed list (`rnsh-rs -a <hash>`).
 
-```
-# Clone the repository  
-git clone https://github.com/mkrueger/icy_tools.git  
-cd icy_tools  
+## Building
 
-# Update the repository and submodules  
-git pull  
-git submodule update --init --recursive  
-
-# Install Rust toolchain  
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh  
-source $HOME/.cargo/env  
-
-# Install dependencies (for Debian/Ubuntu)  
-sudo apt-get install build-essential libssl-dev libasound2-dev
-
-# Install dependencies (for Nobara/Fedora)  
-sudo dnf install @development-tools pkgconf-pkg-config openssl-devel alsa-lib-devel
-
-# If you don't have apt-get, installing these libraries is similar.  
-# The next step will tell you what's missing exactly.  
-
-# Update Rust dependencies  
-cargo update  
-
-# Build the project  
-cargo build --release  
-
-# Executables for all tools are in  
-ls target/release  
+```sh
+cargo build --release -p icy_term
+# -> target/release/ratterm
 ```
 
-# CI and releases
+The crate is still named `icy_term`; only the binary is renamed. Keeping
+upstream's crate and paths intact is what makes rebasing onto IcyTERM cheap.
 
-Pushes and pull requests run `cargo fmt`, the workspace tests, and one debug
-build of IcyTERM. They do not package installers.
+The `reticulum` feature is on by default. Without it you get plain IcyTERM:
 
-Release binaries are built when you push a version tag for one tool:
-
-```
-git tag IcyTerm0.8.3
-git push origin IcyTerm0.8.3
+```sh
+cargo build --release -p icy_term --no-default-features
 ```
 
-Accepted prefixes: `IcyTerm`, `IcyDraw`, `IcyView`. That opens a **draft**
-GitHub release and attaches Linux (`.deb`, AppImage), Windows (`.exe`), and
-macOS (`.dmg`) packages for that tool only. Review the draft, then publish it.
+A `rust-toolchain.toml` pins the toolchain, because rsReticulum needs edition 2024.
 
-You can rebuild an existing tag from Actions → Release → Run workflow.
+## Why a fork?
+
+The transport is built on [rsReticulum](https://github.com/ratspeak/rsReticulum),
+which is **AGPL-3.0-or-later**. IcyTERM is MIT/Apache-2.0. Linking the two makes
+the resulting binary AGPL, which upstream cannot accept for a project shipping
+MIT/Apache release artifacts, so this is a downstream fork rather than a pull
+request.
+
+That direction is fine: MIT and Apache-2.0 are both one-way compatible with
+AGPL-3.0, so a derivative may be distributed under AGPL. The reverse is not true,
+which is exactly why upstream can't take it.
+
+rsReticulum is also `publish = false` and describes itself as experimental, so it
+is pinned by git rev in the workspace `Cargo.toml`.
+
+## Licensing
+
+- Upstream IcyTERM code remains under **MIT or Apache-2.0** (`LICENSE-MIT`,
+  `LICENSE-APACHE`), unmodified.
+- `icy_term` **built with the `reticulum` feature** links AGPL-3.0-or-later code,
+  so *that binary* is **AGPL-3.0-or-later** when distributed.
+- The other crates in this workspace are untouched and unaffected.
+
+If you distribute builds, add the license text:
+
+```sh
+curl -o LICENSE-AGPL https://www.gnu.org/licenses/agpl-3.0.txt
+```
+
+Apache-2.0 §4(b) requires stating that files were changed; the fork commits and
+this file serve that purpose.
+
+## Credits
+
+IcyTERM is by **Mike Krüger**; all of the terminal, rendering, protocol and UI
+work is his. RatTERM only adds a transport.
+
+Reticulum is by **Mark Qvist**; the Rust implementation (rsReticulum) is by
+**ratspeak**.

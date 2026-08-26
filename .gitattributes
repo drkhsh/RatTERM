@@ -1,1 +1,4 @@
 *.rip whitespace=cr-at-eol
+
+# Conflicts on every upstream rebase; regenerate instead of merging.
+Cargo.lock -merge

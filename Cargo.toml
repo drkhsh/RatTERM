@@ -29,10 +29,9 @@ icy_sauce = { git = "https://github.com/mkrueger/icy_sauce" }
 
 #icy_sauce = { path = "../icy_sauce" }
 icy_sixel = "0.6.0"
-# Local fork: adds ConnectionType::Reticulum for the rnsh transport (not yet upstreamed).
-# Based on b42698f0afa6b4347af45aca7718d6d10b90c8af, the rev upstream pins.
 #icy_net = { path = "../icy_board/crates/icy_net" }
-icy_net = { git = "https://github.com/drkhsh/icy_board" }
+# Upstream's pinned icy_net plus ConnectionType::Reticulum. See README.md.
+icy_net = { git = "https://github.com/drkhsh/icy_board", branch = "feature/reticulum-connection-type" }
 #unarc-rs = { path ="../unarc-rs" }
 unarc-rs = { git = "https://github.com/mkrueger/unarc-rs" }
 retrofont = { git = "https://github.com/mkrueger/retrofont" }

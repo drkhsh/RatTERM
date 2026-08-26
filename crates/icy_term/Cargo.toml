@@ -5,7 +5,12 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "A BBS terminal with CP437, PETSCII, Viewdata, RIP, SkyPix, and SyncTERM door graphics/audio"
-repository = "https://github.com/mkrueger/icy_tools"
+repository = "https://github.com/drkhsh/RatTERM"
+
+# Rename the binary only; renaming the crate would churn every path on rebase.
+[[bin]]
+name = "ratterm"
+path = "src/main.rs"
 
 [features]
 default = ["reticulum"]
