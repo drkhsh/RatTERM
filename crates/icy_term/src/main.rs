@@ -60,15 +60,7 @@ static VERSION: LazyLock<Version> = LazyLock::new(|| Version::parse(env!("CARGO_
 static START_TIME: LazyLock<Instant> = LazyLock::new(Instant::now);
 
 static LATEST_VERSION: LazyLock<Version> = LazyLock::new(|| {
-    let github = github_release_check::GitHub::new().unwrap();
-    if let Ok(ver) = github.get_all_versions("mkrueger/icy_tools") {
-        for v in ver {
-            if let Some(rest) = v.strip_prefix("IcyTerm") {
-                return Version::parse(rest).unwrap();
-            }
-        }
-    }
-    VERSION.clone()
+    icy_engine_gui::release_check::latest_release("mkrueger/icy_tools", "IcyTerm").unwrap_or_else(|| VERSION.clone())
 });
 
 #[derive(rust_embed::RustEmbed)]

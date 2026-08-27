@@ -31,7 +31,6 @@ flexi_logger = { workspace = true }
 # CLI
 clap = { workspace = true }
 clap-i18n-richformatter = { workspace = true }
-github_release_check = { workspace = true }
 
 # Core icy_* crates
 icy_engine = { workspace = true }

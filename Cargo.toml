@@ -108,7 +108,6 @@ ab_glyph = "0.2"
 icy_ui = { git = "https://github.com/mkrueger/icy_ui", branch = "master" }
 
 versions = "7.0.0"
-github_release_check = "0.2.1"
 parking_lot = "0.12.5"
 clap-i18n-richformatter = { git = "https://github.com/eatradish/clap-i18n-richformatter" }
 

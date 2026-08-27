@@ -21,7 +21,6 @@ tokio = { workspace = true }
 serde = { workspace = true }
 versions = { workspace = true }
 regex = { workspace = true }
-github_release_check = { workspace = true }
 semver = { workspace = true }
 webbrowser = { workspace = true }
 icy_engine_gui = { workspace = true }

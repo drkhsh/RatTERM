@@ -123,17 +123,7 @@ lazy_static::lazy_static! {
 
     /// Latest version available on GitHub (checked at startup)
     pub static ref LATEST_VERSION: Version = {
-        let github = github_release_check::GitHub::new().unwrap();
-        if let Ok(ver) = github.get_all_versions("mkrueger/icy_tools") {
-            for v in ver {
-                if v.starts_with("IcyView") {
-                    if let Ok(parsed) = Version::parse(&v[7..]) {
-                        return parsed;
-                    }
-                }
-            }
-        }
-        VERSION.clone()
+        icy_engine_gui::release_check::latest_release("mkrueger/icy_tools", "IcyView").unwrap_or_else(|| VERSION.clone())
     };
 }
 

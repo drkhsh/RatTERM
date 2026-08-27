@@ -47,6 +47,9 @@ rodio = { workspace = true }
 tokio = { workspace = true, features = ["rt", "time", "sync"] }
 semver = { workspace = true }
 
+# GitHub release check for the "update available" banners
+reqwest = { workspace = true, features = ["json"] }
+
 # File dialog
 rfd = { workspace = true }
 

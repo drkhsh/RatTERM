@@ -52,15 +52,7 @@ static START_TIME: LazyLock<Instant> = LazyLock::new(Instant::now);
 
 #[allow(dead_code)] // reserved for a future update-check UI; previously hidden from dead_code analysis by the lazy_static macro
 static LATEST_VERSION: LazyLock<Version> = LazyLock::new(|| {
-    let github = github_release_check::GitHub::new().unwrap();
-    if let Ok(ver) = github.get_all_versions("mkrueger/icy_tools") {
-        for v in ver {
-            if let Some(rest) = v.strip_prefix("IcyMail") {
-                return Version::parse(rest).unwrap();
-            }
-        }
-    }
-    VERSION.clone()
+    icy_engine_gui::release_check::latest_release("mkrueger/icy_tools", "IcyMail").unwrap_or_else(|| VERSION.clone())
 });
 /*
 #[derive(rust_embed::RustEmbed)]

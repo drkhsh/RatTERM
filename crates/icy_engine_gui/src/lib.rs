@@ -83,6 +83,8 @@ pub mod util;
 
 pub mod music;
 
+pub mod release_check;
+
 //pub mod terminal_shader_widget;
 
 use serde::{Deserialize, Serialize};

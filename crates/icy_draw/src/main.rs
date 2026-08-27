@@ -79,17 +79,7 @@ pub static PENDING_NEW_WINDOW_BUFFERS: std::sync::LazyLock<std::sync::Mutex<Vec<
 
 /// Latest version available on GitHub (checked at startup)
 pub static LATEST_VERSION: std::sync::LazyLock<Version> = std::sync::LazyLock::new(|| {
-    let github = github_release_check::GitHub::new().unwrap();
-    if let Ok(ver) = github.get_all_versions("mkrueger/icy_tools") {
-        for v in ver {
-            if let Some(rest) = v.strip_prefix("IcyDraw") {
-                if let Ok(parsed) = Version::parse(rest) {
-                    return parsed;
-                }
-            }
-        }
-    }
-    VERSION.clone()
+    icy_engine_gui::release_check::latest_release("mkrueger/icy_tools", "IcyDraw").unwrap_or_else(|| VERSION.clone())
 });
 
 #[derive(rust_embed::RustEmbed)]
