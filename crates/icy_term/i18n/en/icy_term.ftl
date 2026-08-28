@@ -133,6 +133,7 @@ dialing_directory-protocol = Protocol
 dialing_directory-proxy = Proxy
 dialing_directory-proxy-host = Proxy host
 dialing_directory-proxy-auth = Proxy auth
+dialing_directory-proxy-password-stored = (stored)
 dialing_directory-user = User
 dialing_directory-password = Password
 dialing_directory-ssh-authentication = SSH authentication

@@ -291,7 +291,12 @@ impl super::DialingDirectoryState {
                         .padding(6)
                         .size(TEXT_SIZE_NORMAL)
                         .width(Length::Fixed(160.0));
-                    let pass_input = text_input("", proxy.password.as_deref().unwrap_or(""))
+                    let pass_placeholder = if proxy.password.is_some() && self.proxy_password_input.is_empty() {
+                        fl!(crate::LANGUAGE_LOADER, "dialing_directory-proxy-password-stored")
+                    } else {
+                        String::new()
+                    };
+                    let pass_input = text_input(&pass_placeholder, &self.proxy_password_input)
                         .on_input(move |s| {
                             Message::from(DialingDirectoryMsg::AddressFieldChanged {
                                 id,

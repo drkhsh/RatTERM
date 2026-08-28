@@ -3458,7 +3458,7 @@ dependencies = [
 [[package]]
 name = "icy_net"
 version = "0.2.1"
-source = "git+https://github.com/drkhsh/icy_board?branch=feature%2Fsocks5-proxy#a9c796032dfd1256028e91e358c8e61e91623b74"
+source = "git+https://github.com/mkrueger/icy_board?rev=b42698f0afa6b4347af45aca7718d6d10b90c8af#b42698f0afa6b4347af45aca7718d6d10b90c8af"
 dependencies = [
  "async-trait",
  "bytes",

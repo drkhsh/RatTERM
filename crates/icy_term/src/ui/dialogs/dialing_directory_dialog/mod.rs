@@ -38,6 +38,8 @@ pub struct DialingDirectoryState {
     pub quick_connect_address: Address,
     pub scroll_id: widget::Id,
 
+    proxy_password_input: String,
+
     // Scroll viewport tracking
     scroll_offset_y: f32,
     visible_height: f32,
@@ -58,6 +60,7 @@ impl DialingDirectoryState {
             pending_delete: None,
             quick_connect_address: Address::default(),
             scroll_id: widget::Id::unique(),
+            proxy_password_input: String::new(),
             scroll_offset_y: 0.0,
             visible_height: 0.0,
             last_click_time: None,
@@ -151,6 +154,9 @@ impl DialingDirectoryState {
                     false
                 };
 
+                if self.selected_bbs != idx {
+                    self.proxy_password_input.clear();
+                }
                 self.last_click_time = Some(now);
                 self.last_clicked_index = idx;
                 self.selected_bbs = idx;
@@ -246,6 +252,7 @@ impl DialingDirectoryState {
             }
 
             DialingDirectoryMsg::AddressFieldChanged { id, field } => {
+                let mut new_proxy_password = None;
                 let mut lock = self.addresses.lock();
                 let addr = if let Some(id) = id {
                     let Some(address) = lock.addresses.get_mut(id) else {
@@ -351,6 +358,7 @@ impl DialingDirectoryState {
                             // Keep any existing settings when switching to custom.
                             ProxyPreset::Custom => Some(addr.proxy.clone().unwrap_or_else(|| icy_net::proxy::ProxyConfig::socks5("127.0.0.1", 1080))),
                         };
+                        new_proxy_password = Some(String::new());
                     }
                     AddressFieldChange::ProxyHost(host) => {
                         if let Some(proxy) = addr.proxy.as_mut() {
@@ -373,9 +381,19 @@ impl DialingDirectoryState {
                     }
                     AddressFieldChange::ProxyPassword(password) => {
                         if let Some(proxy) = addr.proxy.as_mut() {
-                            proxy.password = if password.is_empty() { None } else { Some(password) };
+                            proxy.password = if password.is_empty() {
+                                None
+                            } else {
+                                Some(icy_net::ssh::SecretString::new(password.clone()))
+                            };
                         }
+                        new_proxy_password = Some(password);
                     }
+                }
+
+                drop(lock);
+                if let Some(password) = new_proxy_password {
+                    self.proxy_password_input = password;
                 }
 
                 Task::none()
