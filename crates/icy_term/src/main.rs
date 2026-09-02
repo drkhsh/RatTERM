@@ -59,10 +59,6 @@ static VERSION: LazyLock<Version> = LazyLock::new(|| Version::parse(env!("CARGO_
 #[allow(dead_code)] // reserved for a future uptime display; previously hidden from dead_code analysis by the lazy_static macro
 static START_TIME: LazyLock<Instant> = LazyLock::new(Instant::now);
 
-static LATEST_VERSION: LazyLock<Version> = LazyLock::new(|| {
-    icy_engine_gui::release_check::latest_release("mkrueger/icy_tools", "IcyTerm").unwrap_or_else(|| VERSION.clone())
-});
-
 #[derive(rust_embed::RustEmbed)]
 #[folder = "i18n"] // path to the compiled localization resources
 struct Localizations;

@@ -19,7 +19,7 @@ use parking_lot::Mutex;
 use std::sync::Arc;
 // use iced_aw::{menu, menu_bar, menu_items};
 
-use crate::{ui::Message, Address, Options, LATEST_VERSION, VERSION};
+use crate::{ui::Message, Address, Options};
 
 // Icon SVG constants
 const DISCONNECT_SVG: &[u8] = include_bytes!("../../data/icons/logout.svg");
@@ -257,49 +257,6 @@ impl TerminalWindow {
         items
     }
 
-    fn create_update_notification(&self) -> Element<'_, Message> {
-        container(
-            button(
-                row![
-                    text(fl!(crate::LANGUAGE_LOADER, "menu-upgrade_version", version = LATEST_VERSION.to_string())).size(TEXT_SIZE_SMALL),
-                    text(" →").size(TEXT_SIZE_SMALL)
-                ]
-                .spacing(4)
-                .align_y(Alignment::Center),
-            )
-            .on_press(Message::OpenReleaseLink)
-            .padding([4, 8])
-            .style(|_theme: &icy_ui::Theme, status| {
-                use icy_ui::widget::button::{Status, Style};
-
-                let info_color = Color::from_rgb(0.2, 0.6, 1.0);
-                let base = Style {
-                    background: Some(icy_ui::Background::Color(Color::TRANSPARENT)),
-                    text_color: info_color,
-                    border: Border::default(),
-                    shadow: icy_ui::Shadow::default(),
-                    snap: false,
-                    ..Default::default()
-                };
-
-                match status {
-                    Status::Hovered => Style {
-                        background: Some(icy_ui::Background::Color(Color::from_rgba(info_color.r, info_color.g, info_color.b, 0.1))),
-                        ..base
-                    },
-                    Status::Pressed => Style {
-                        background: Some(icy_ui::Background::Color(Color::from_rgba(info_color.r, info_color.g, info_color.b, 0.15))),
-                        ..base
-                    },
-                    Status::Active | Status::Selected | Status::Disabled => base,
-                }
-            }),
-        )
-        .width(Length::Shrink)
-        .padding([2, 6])
-        .into()
-    }
-
     fn create_button_bar(&self) -> Element<'_, Message> {
         // Phonebook/Connect button (serves dual purpose)
         let phonebook_btn = {
@@ -410,10 +367,6 @@ impl TerminalWindow {
                 bar_content = bar_content.push(stop_sound_btn);
                 bar_content = bar_content.push(container(text(" | ").size(10)).padding([0, 2]));
             }
-        }
-
-        if *VERSION < *LATEST_VERSION {
-            bar_content = bar_content.push(self.create_update_notification());
         }
 
         bar_content = bar_content.push(Space::new().width(Length::Fill));

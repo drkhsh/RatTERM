@@ -57,7 +57,6 @@ pub enum Message {
         protocol: TransferProtocol,
         is_download: bool,
     },
-    OpenReleaseLink,
     StartCapture(String),
     StopCapture,
     ShowIemsiDialog,

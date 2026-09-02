@@ -598,13 +598,6 @@ impl MainWindow {
                 self.state.mode = MainWindowMode::ShowTerminal;
                 Task::none()
             }
-            Message::OpenReleaseLink => {
-                let url = format!("https://github.com/mkrueger/icy_tools/releases/tag/IcyTerm{}", *crate::LATEST_VERSION);
-                if let Err(e) = webbrowser::open(&url) {
-                    eprintln!("Failed to open release link: {e}");
-                }
-                Task::none()
-            }
             Message::ShowSettings => {
                 self.switch_to_terminal_screen();
 
