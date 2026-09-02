@@ -15,6 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      # This workspace's dep tree (wgpu, resvg, mlua, opus, ...) exhausts the
+      # runner's 14 GB. Reclaims ~25 GB of preinstalled toolchains we don't use.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
       # `cargo fmt --all --check` fails on upstream's own tree (icy_engine,
       # icy_draw, icy_mail, icy_view and upstream's rlogin calls), so scope the
       # check to the module this fork owns.
