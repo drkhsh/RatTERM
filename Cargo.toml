@@ -45,9 +45,9 @@ libyaff = { git = "https://github.com/mkrueger/libyaff" }
 
 codepages = { git = "https://github.com/mkrueger/icy_board" }
 
-# Reticulum (rnsh) transport — experimental, pinned by rev.
-rns-runtime = { git = "https://github.com/ratspeak/rsReticulum", rev = "e6dd6b3ab3dc38a7695390fc20514312633efeb2" }
-rns-identity = { git = "https://github.com/ratspeak/rsReticulum", rev = "e6dd6b3ab3dc38a7695390fc20514312633efeb2" }
+# rsReticulum is publish = false upstream, hence the git tag pin.
+rns-runtime = { git = "https://github.com/ratspeak/rsReticulum", tag = "v1.2.0" }
+rns-identity = { git = "https://github.com/ratspeak/rsReticulum", tag = "v1.2.0" }
 
 zip = "8.6.0"
 lazy_static = "1.5.0"
