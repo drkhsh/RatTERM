@@ -94,6 +94,11 @@ copyright = "Copyright (c) Mike Krüger 2022, drkhsh 2026"
 
 [package.metadata.deb]
 name = "ratterm"
+# Without these, cargo-deb takes the maintainer from workspace authors (Mike
+# Krüger, who does not maintain this fork's packages) and the extended
+# description from the crate README, markdown heading and all.
+maintainer = "drkhsh <me@drkhsh.at>"
+extended-description = """A BBS terminal supporting CP437, PETSCII, ATASCII, Viewdata, RIPscrip and SkyPix, plus SyncTERM door graphics and audio. This fork of IcyTERM adds a Reticulum (rnsh) connection type for dialling boards published on the Reticulum mesh."""
 section = "Network"
 copyright = "Copyright (c) Mike Krüger 2022, drkhsh 2026"
 revision = ""
