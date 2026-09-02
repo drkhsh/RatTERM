@@ -3,7 +3,10 @@ name = "icy_term"
 version = "0.8.4"
 authors.workspace = true
 edition.workspace = true
-license.workspace = true
+# The default `reticulum` feature links AGPL-3.0-or-later rsReticulum, so the
+# distributed binary is AGPL. Built with --no-default-features it is upstream's
+# MIT or Apache-2.0. The metadata has to describe what actually ships.
+license = "AGPL-3.0-or-later"
 description = "A BBS terminal with CP437, PETSCII, Viewdata, RIP, SkyPix, and SyncTERM door graphics/audio"
 repository = "https://github.com/drkhsh/RatTERM"
 
