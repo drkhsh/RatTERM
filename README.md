@@ -18,10 +18,12 @@ cannot go upstream; see [Why a fork?](#why-a-fork).
    `rns://` prefix is accepted and ignored.
 3. Connect.
 
-RatTERM uses your **existing Reticulum configuration**, the default config
-directory shared with `rnsd` and other RNS apps, so whatever interfaces you
-already have are what it routes over. At least one working interface with a path
-to the destination is required.
+If a **Reticulum shared instance** is already running, RatTERM attaches to it
+and routes over its interfaces; the reference Python `rnsd` uses the same local
+socket, so its instance works too. Otherwise RatTERM brings up its own instance
+from rsReticulum's config directory (`~/.config/rsReticulum/config` on Linux),
+which has no interfaces until you add them. Either way, a working interface with
+a path to the destination is required.
 
 On first use a client identity is generated as `reticulum_identity` inside
 IcyTERM's config directory, which RatTERM deliberately shares. To reach a
