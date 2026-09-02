@@ -174,7 +174,7 @@ fn main() {
         None
     };
 
-    log::info!("Starting iCY TERM {}", *VERSION);
+    log::info!("Starting RatTERM {}", *VERSION);
     icy_net::websocket::init_websocket_providers();
 
     let url_for_closure = args.url;

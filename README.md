@@ -5,11 +5,11 @@ Krüger that adds a **Reticulum (rnsh) connection type**, so you can dial BBSes
 published on the [Reticulum](https://reticulum.network/) mesh the same way you
 dial a Telnet or SSH board.
 
-Everything else is upstream IcyTERM, unchanged, including the other tools in
-this workspace ([Icy Draw](crates/icy_draw/README.md),
-[Icy View](crates/icy_view/README.md), [Icy Play](crates/icy_play/README.md)).
-This fork exists only because the Reticulum transport cannot go upstream; see
-[Why a fork?](#why-a-fork).
+It also renames the binary to `ratterm` and drops upstream's update-check
+banner. The other tools in this workspace ([Icy Draw](crates/icy_draw/README.md),
+[Icy View](crates/icy_view/README.md), [Icy Play](crates/icy_play/README.md))
+are untouched upstream code. The fork exists because the Reticulum transport
+cannot go upstream; see [Why a fork?](#why-a-fork).
 
 ## Using it
 
@@ -23,9 +23,10 @@ directory shared with `rnsd` and other RNS apps, so whatever interfaces you
 already have are what it routes over. At least one working interface with a path
 to the destination is required.
 
-On first use a client identity is generated and stored next to IcyTERM's config
-as `reticulum_identity`. To reach a listener that restricts access, add that
-identity's hash to its allowed list (`rnsh-rs -a <hash>`).
+On first use a client identity is generated as `reticulum_identity` inside
+IcyTERM's config directory, which RatTERM deliberately shares. To reach a
+listener that restricts access, add that identity's hash to its allowed list
+(`rnsh-rs -a <hash>`).
 
 ## Building
 
@@ -57,8 +58,8 @@ That direction is fine: MIT and Apache-2.0 are both one-way compatible with
 AGPL-3.0, so a derivative may be distributed under AGPL. The reverse is not true,
 which is exactly why upstream can't take it.
 
-rsReticulum is also `publish = false` and describes itself as experimental, so it
-is pinned by git rev in the workspace `Cargo.toml`.
+rsReticulum is also `publish = false` and describes itself as experimental, so
+the workspace `Cargo.toml` pins it to a release tag.
 
 ## Licensing
 
@@ -74,13 +75,13 @@ If you distribute builds, add the license text:
 curl -o LICENSE-AGPL https://www.gnu.org/licenses/agpl-3.0.txt
 ```
 
-Apache-2.0 §4(b) requires stating that files were changed; the fork commits and
+Apache-2.0 section 4(b) requires stating that files were changed; the fork commits and
 this file serve that purpose.
 
 ## Credits
 
 IcyTERM is by **Mike Krüger**; all of the terminal, rendering, protocol and UI
-work is his. RatTERM only adds a transport.
+work is his. RatTERM adds a transport and renames the result.
 
 Reticulum is by **Mark Qvist**; the Rust implementation (rsReticulum) is by
 **ratspeak**.

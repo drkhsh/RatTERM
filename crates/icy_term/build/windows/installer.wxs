@@ -1,8 +1,9 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-   <?define PackageName="IcyTerm" ?>
-   <?define ExeName="icy_term" ?>
-   <?define Guid1="fd9f3ffb-4f33-492d-a246-4c87f75df051" ?>
-   <?define Guid2="92781609-a246-4dc1-bbf6-21b54050ca54" ?>
+   <?define PackageName="RatTERM" ?>
+   <?define ExeName="ratterm" ?>
+   <!-- Fresh GUIDs: RatTERM is a separate product, not an IcyTerm upgrade. -->
+   <?define Guid1="f9e78b79-5151-4198-9c78-698b4382c11f" ?>
+   <?define Guid2="6d9c192b-01e0-421c-8cf3-1f0baacba8af" ?>
    
    <Package Name="$(PackageName)" UpgradeCode="$(Guid1)" Language="1033" Codepage="1252" Version="$(var.VERSION)" Manufacturer="GitHub" InstallerVersion="200">
       <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of [ProductName] is already installed." />

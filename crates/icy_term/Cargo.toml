@@ -83,36 +83,38 @@ chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 winres = "0.1"
 
 [package.metadata.bundle]
-name = "Icy Term"
-identifier = "com.github.icy_term"
+name = "RatTERM"
+identifier = "at.drkhsh.ratterm"
 icon = ["build/mac/128x128@2x.png"]
 resources = []
-copyright = "Copyright (c) Mike Krüger 2022. All rights reserved."
+copyright = "Copyright (c) Mike Krüger 2022, drkhsh 2026"
 
 [package.metadata.deb]
+name = "ratterm"
 section = "Network"
-copyright = "Copyright (c) Mike Krüger 2022. All rights reserved."
+copyright = "Copyright (c) Mike Krüger 2022, drkhsh 2026"
 revision = ""
 depends = "$auto, libasound2"
+# Paths follow the renamed binary, not the crate.
 assets = [
     [
-        "target/release/icy_term",
+        "target/release/ratterm",
         "/usr/bin/",
         "755",
     ],
     [
-        "build/linux/icy_term.desktop",
+        "build/linux/ratterm.desktop",
         "/usr/share/applications/",
         "644",
     ],
     [
         "build/linux/128x128.png",
-        "/usr/share/icons/hicolor/128x128/apps/icy_term.png",
+        "/usr/share/icons/hicolor/128x128/apps/ratterm.png",
         "644",
     ],
     [
         "build/linux/256x256.png",
-        "/usr/share/icons/hicolor/256x256/apps/icy_term.png",
+        "/usr/share/icons/hicolor/256x256/apps/ratterm.png",
         "644",
     ],
 ]

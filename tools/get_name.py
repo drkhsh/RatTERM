@@ -6,7 +6,7 @@ if len(sys.argv) != 2:
 
 match sys.argv[1]:
     case "icy_term":
-        print("Icy Term")
+        print("RatTERM")
     case "icy_draw":
         print("Icy Draw")
     case "icy_view":

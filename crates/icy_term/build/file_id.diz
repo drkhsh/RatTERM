@@ -1,7 +1,9 @@
-         -* ICY TERM #VERSION *-
+          -* RATTERM #VERSION *-
 
-A modern terminal program for BBS systems.
+A BBS terminal that also dials the
+Reticulum mesh. Fork of IcyTERM.
 
+- Reticulum (rnsh) connection type
 - Written in pure rust - fast & secure
 - Multi platform Windows, OSX, Linux
 - X/Y/Z Modem + variants
@@ -13,5 +15,5 @@ A modern terminal program for BBS systems.
 - SyncTERM doors: cached JXL, Audio
   APC/Opus, Kitty keys, pixel mouse
 
-For latest builds/development visit:
-GitHub https://github.com/mkrueger/icy_tools
+Fork:     github.com/drkhsh/RatTERM
+Upstream: github.com/mkrueger/icy_tools

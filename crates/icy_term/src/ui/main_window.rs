@@ -208,7 +208,7 @@ impl MainWindow {
         Self {
             effect: 0,
             id,
-            title: format!("iCY TERM {}", *crate::VERSION),
+            title: format!("RatTERM {}", *crate::VERSION),
             state: MainWindowState {
                 mode,
                 #[cfg(test)]

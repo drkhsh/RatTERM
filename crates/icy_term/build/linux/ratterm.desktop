@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=RatTERM
+Comment=A BBS terminal with a Reticulum (rnsh) connection type
+Categories=Network;Utility;
+Icon=ratterm
+Exec=/usr/bin/ratterm
+StartupWMClass=ratterm
+Terminal=false
